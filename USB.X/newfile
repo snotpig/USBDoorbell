@@ -1,0 +1,140 @@
+;!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+;--------------------------------------------------------------
+_ReportDescriptor
+        call    Orng;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        movlw   0x06            ; USAGE PAGE
+        movwi   FSR0++
+        movlw   0x01            ; (Generic Desktop)
+        movwi   FSR0++
+        movlw   0xff            ; (vendor)
+        movwi   FSR0++
+        movlw   0x09            ; USAGE
+        movwi   FSR0++
+        movlw   0x04            ; (Joystick)
+        movwi   FSR0++
+        movlw   0xa1            ; COLLECTION
+        movwi   FSR0++
+        movlw   0x01            ; (application)                       ;6
+        movwi   FSR0++
+
+        movlw   0x05            ; USAGE PAGE
+        movwi   FSR0++
+        movlw   0x09            ; (Button)
+        movwi   FSR0++
+        movlw   0x19            ; USAGE MINIMUM
+        movwi   FSR0++
+        movlw   0x01            ; (Button 1)
+        movwi   FSR0++
+        movlw   0x29            ; USAGE MAXIMUM
+        movwi   FSR0++
+        movlw   0x04            ; (Button 4)
+        movwi   FSR0++
+        movlw   0x15            ; LOGICAL MINIMUM
+        movwi   FSR0++
+        movlw   0x00            ; (0)
+        movwi   FSR0++
+        movlw   0x25            ; LOGICAL MAXIMUM
+        movwi   FSR0++
+        movlw   0x01            ; (1)
+        movwi   FSR0++
+        movlw   0x75            ; REPORT SIZE
+        movwi   FSR0++
+        movlw   0x01            ; (1)
+        movwi   FSR0++
+        movlw   0x95            ; REPORT COUNT
+        movwi   FSR0++
+        movlw   0x04            ; (4)
+        movwi   FSR0++
+        movlw   0x81            ; INPUT
+        movwi   FSR0++
+        movlw   0x02            ; (Data, Variable, Absolute)            ;16
+        movwi   FSR0++
+
+        movlw   0x95            ; REPORT COUNT
+        movwi   FSR0++
+        movlw   0x04            ; (4)
+        movwi   FSR0++
+        movlw   0x81            ; INPUT
+        movwi   FSR0++
+        movlw   0x01            ; (Constant)                            ;4
+        movwi   FSR0++
+
+        movlw   0x05            ; USAGE  PAGE
+        movwi   FSR0++
+        movlw   0x08            ; (LEDs)
+        movwi   FSR0++
+        movlw   0x19            ; USAGE MINIMUM
+        movwi   FSR0++
+        movlw   0x2c            ; (busy)
+        movwi   FSR0++
+        movlw   0x29            ; USAGE MAXIMUM
+        movwi   FSR0++
+        movlw   0x2d            ; (ready)
+        movwi   FSR0++
+        movlw   0x15            ; LOGICAL MINIMUM
+        movwi   FSR0++
+        movlw   0x00            ; (0)
+        movwi   FSR0++
+        movlw   0x25            ; LOGICAL MAXIMUM
+        movwi   FSR0++
+        movlw   0x01            ; (1)
+        movwi   FSR0++
+        movlw   0x95            ; REPORT COUNT
+        movwi   FSR0++
+        movlw   0x02            ; (8)
+        movwi   FSR0++
+        movlw   0x75            ; REPORT SIZE
+        movwi   FSR0++
+        movlw   0x01            ; (1)
+        movwi   FSR0++
+        movlw   0x91            ; OUTPUT
+        movwi   FSR0++
+        movlw   0x02            ; (Data, Variable, Absolute)            ;16
+        movwi   FSR0++
+
+        movlw   0xc0            ; END COLLECTION (application)          ;1
+        movwi   FSR0++
+
+        movlw   JSREPORTDESCBC                                          ;43
+        movwf   DescriptorLength
+        return
+
+        movlw   0x09            ; USAGE
+        movwi   FSR0++
+        movlw   0x01            ; (Pointer)
+        movwi   FSR0++
+        movlw   0xa1            ; COLLECTION
+        movwi   FSR0++
+        movlw   0x00            ; (Physical)
+        movwi   FSR0++
+        movlw   0x09            ; USAGE
+        movwi   FSR0++
+        movlw   0x30            ; (X)
+        movwi   FSR0++
+        movlw   0x09            ; USAGE
+        movwi   FSR0++
+        movlw   0x31            ; (Y)
+        movwi   FSR0++
+        movlw   0x15            ; LOGICAL MINIMUM
+        movwi   FSR0++
+        movlw   0x00            ; (0)
+        movwi   FSR0++
+        movlw   0x25            ; LOGICAL MAXIMUM
+        movwi   FSR0++
+        movlw   0x7f            ; (127)
+        movwi   FSR0++
+        movlw   0x75            ; REPORT SIZE
+        movwi   FSR0++
+        movlw   0x08            ; (8)
+        movwi   FSR0++
+        movlw   0x95            ; REPORT COUNT
+        movwi   FSR0++
+        movlw   0x02            ; (2)
+        movwi   FSR0++
+        movlw   0x81            ; INPUT
+        movwi   FSR0++
+        movlw   0x02            ; (Data, Variable, Absolute)
+        movwi   FSR0++
+        movlw   0xc0            ; END COLLECTION                        ;25
+        movwi   FSR0++
+

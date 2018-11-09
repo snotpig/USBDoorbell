@@ -1,0 +1,2985 @@
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE  1
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00001 ;********************************************************************************
+                      00002 ;
+                      00003 ;       USB HID CLASS DEVICE
+                      00004 ;
+                      00005 ;********************************************************************************
+                      00006         list p=16f1454
+                      00007         #include p16f1454.inc
+                      00001         LIST
+                      00002 
+                      00003 ;==========================================================================
+                      00004 ;  MPASM PIC16F1454 processor include
+                      00005 ; 
+                      00006 ;  (c) Copyright 1999-2014 Microchip Technology, All rights reserved
+                      00007 ;==========================================================================
+                      00008 
+                      01026         LIST
+                      00008     #include usb_defs.inc
+                      00001 #define NUM_CONFIGURATIONS      1
+                      00002 #define NUM_INTERFACES          1
+                      00003 #define NUM_STRINGS                     2
+                      00004 #define MAX_PACKET_SIZE         0x40    ; maximum packet size for low-speed peripherals is 8 bytes, for 
+                            full-speed peripherals it can be 8, 16, 32, or 64 bytes
+                      00005 #define UPDATE_PERIOD       0x03    ; x4 ms
+                      00006 #define OUT_REPORT_SIZE     0x02
+                      00007 #define IN_REPORT_SIZE      0x02
+                      00008 
+                      00009 ; Define the states that the USB interface can be in
+                      00010 #define POWERED_STATE   0x00
+                      00011 #define DEFAULT_STATE   0x01
+                      00012 #define ADDRESS_STATE   0x02
+                      00013 #define CONFIG_STATE    0x03
+                      00014 
+                      00015 ; Define the states for Control EndPoints
+                      00016 #define EP_IDLE_STATE           0x00
+                      00017 #define EP_SETUP_STATE          0x01
+                      00018 #define EP_DISABLED_STATE       0xff
+                      00019 
+                      00020 #define ENDPT_DISABLED          0x00
+                      00021 #define ENDPT_IN_ONLY           0x12
+                      00022 #define ENDPT_OUT_ONLY          0x14
+                      00023 #define ENDPT_CONTROL           0x16    ; enable for in, out and setup
+                      00024 #define ENDPT_NON_CONTROL       0x1E    ; enable for in, and out
+                      00025 
+                      00026 #define INT_STAT_MASK_RESET         0x01
+                      00027 #define INT_STAT_MASK_ERROR         0x02
+                      00028 #define INT_STAT_MASK_TOKEN_DONE        0x04
+                      00029 #define INT_STAT_MASK_SLEEP         0x08
+                      00030 #define INT_STAT_MASK_STALL         0x10
+                      00031 
+                      00032 #define TOKEN_OUT       (0x01<<2)
+                      00033 #define TOKEN_ACK       (0x02<<2)
+                      00034 #define TOKEN_IN        (0x09<<2)
+                      00035 #define TOKEN_SETUP     (0x0D<<2)
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE  2
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00036 
+                      00037 ; Define buffer descriptor table register mapping for no ping-pong buffers
+                      00038 #define BD0STATL    0x00
+                      00039 #define BD0STATH    0x20
+                      00040 #define BD0CNTL         0x01
+                      00041 #define BD0CNTH         0x20
+                      00042 #define BD0ADRLL        0x02
+                      00043 #define BD0ADRLH        0x20
+                      00044 #define BD0ADRHL        0x03
+                      00045 #define BD0ADRHH        0x20
+                      00046 #define BD0DATAL        0x40
+                      00047 #define BD0DATAH        0x20
+                      00048 #define BD1STATL    0x04
+                      00049 #define BD1STATH    0x20
+                      00050 #define BD1CNTL         0x05
+                      00051 #define BD1CNTH         0x20
+                      00052 #define BD1ADRLL        0x06
+                      00053 #define BD1ADRLH        0x20
+                      00054 #define BD1ADRHL        0x07
+                      00055 #define BD1ADRHH        0x20
+                      00056 #define BD1DATAL        0x80
+                      00057 #define BD1DATAH        0x20
+                      00058 #define BD2STATL    0x08
+                      00059 #define BD2STATH    0x20
+                      00060 #define BD2CNTL         0x09
+                      00061 #define BD2CNTH         0x20
+                      00062 #define BD2ADRLL        0x0a
+                      00063 #define BD2ADRLH        0x20
+                      00064 #define BD2ADRHL        0x0b
+                      00065 #define BD2ADRHH        0x20
+                      00066 #define BD2DATAL        0xc0
+                      00067 #define BD2DATAH        0x20
+                      00068 #define BD3STATL    0x0c
+                      00069 #define BD3STATH    0x20
+                      00070 #define BD3CNTL         0x0d
+                      00071 #define BD3CNTH         0x20
+                      00072 #define BD3ADRLL        0x0e
+                      00073 #define BD3ADRLH        0x20
+                      00074 #define BD3ADRHL        0x0f
+                      00075 #define BD3ADRHH        0x20
+                      00076 #define BD3DATAL        0xe0
+                      00077 #define BD3DATAH        0x20
+                      00078 
+                      00079 #define BSTALL      0x02
+                      00080 #define DTSEN       0x03
+                      00081 #define DTS         0x06
+                      00082 #define UOWN            0x07
+                      00083 
+                      00084 ; offsets from the beginning of the Buffer Descriptor
+                      00085 #define BYTECOUNT       0x01
+                      00086 #define ADDRESSL        0x02
+                      00087 #define ADDRESSH        0x03
+                      00088 
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE  3
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00089 ; standard descriptor types
+                      00090 #define DEVICE          1
+                      00091 #define CONFIGURATION   2
+                      00092 #define STRING          3
+                      00093 #define INTERFACE       4
+                      00094 #define ENDPOINT        5
+                      00095 
+                      00096 ; descriptor byte counts
+                      00097 #define DEVDESCBC       0x12
+                      00098 #define CONFDESCBC      0x09
+                      00099 #define IFDESCBC        0x09
+                      00100 #define EPDESCBC        0x07
+                      00101 #define STR0DESCBC      0x04
+                      00102 #define STR1DESCBC      0x10
+                      00103 #define STR2DESCBC      0x12
+                      00104 #define INTINDESCBC     0x07
+                      00105 #define HIDDESCBC       0x09
+                      00106 #define REPORTDESCBC    0x22
+                      00107 #define JSREPORTDESCBC  0x2b
+                      00108 #define TOTALCONFDESCBC CONFDESCBC + IFDESCBC + HIDDESCBC + EPDESCBC + EPDESCBC
+                      00109 
+                      00110 ; HID class descriptor types
+                      00111 #define HID                     0x21
+                      00112 #define REPORT          0x22
+                      00113 #define PHYSICAL        0x23
+                      00114 
+                      00115 ; offsets from the beginning of the setup data record
+                      00116 #define bmRequestType   0x00
+                      00117 #define bRequest        0x01
+                      00118 #define wValue          0x02
+                      00119 #define wValueHigh      0x03
+                      00120 #define wIndex          0x04
+                      00121 #define wIndexHigh      0x05
+                      00122 #define wLength         0x06
+                      00123 #define wLengthHigh     0x07
+                      00124 
+                      00125 ; Standard USB requests
+                      00126 #define NO_REQUEST          0xFF
+                      00127 #define GET_STATUS          0x00
+                      00128 #define CLEAR_FEATURE       0x01
+                      00129 #define SET_FEATURE         0x03
+                      00130 #define SET_ADDRESS         0x05
+                      00131 #define GET_DESCRIPTOR      0x06
+                      00132 #define SET_DESCRIPTOR      0x07
+                      00133 #define GET_CONFIGURATION       0x08
+                      00134 #define SET_CONFIGURATION       0x09
+                      00135 #define GET_INTERFACE       0x0A
+                      00136 #define SET_INTERFACE       0x0B
+                      00137 #define SYNCH_FRAME         0x0C
+                      00138 #define TEST                0xfa; for test only
+                      00139 #define INT_IN              0xfb; non-standard
+                      00140 #define INT_OUT             0xfc; non-standard
+                      00141 
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE  4
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00142 ; HID Class requests
+                      00143 #define GET_REPORT              0x01
+                      00144 #define GET_IDLE                0x02
+                      00145 #define GET_PROTOCOL    0x03
+                      00146 #define SET_REPORT              0x09
+                      00147 #define SET_IDLE                0x0A
+                      00148 #define SET_PROTOCOL    0x0B
+                      00149 
+                      00150 #define REPORT_TYPE_INPUT   0x01
+                      00151 #define REPORT_TYPE_FEATURE 0x03
+                      00152 
+                      00153 #define GET_STRING_DESCRIPTOR   0x66
+                      00154 #define HID_SET_REPORT          0x21
+                      00155 #define VEND_SET_MEMORY         0x80
+                      00156 
+                      00157 #define EP0                             0x00 << 3
+                      00158 #define EP1                             0x01 << 3
+                      00159 #define EP2                             0x02 << 3
+                      00160 
+                      00161 #define STANDARD                0x00 << 5
+                      00162 #define CLASS                   0x01 << 5
+                      00163 #define VENDOR                  0x02 << 5
+                      00164 
+                      00165 #define RECIPIENT_DEVICE        0x00
+                      00166 #define RECIPIENT_INTERFACE     0x01
+                      00167 #define RECIPIENT_ENDPOINT      0x02
+                      00168 
+                      00169 #define HOSTTODEVICE        0x00
+                      00170 #define DEVICETOHOST        0x80
+                      00171 #define HOSTTOINTERFACE     0x01
+                      00172 #define INTERFACETOHOST     0x81
+                      00173 #define HOSTTOENDPOINT      0x02
+                      00174 #define ENDPOINTTOHOST      0x82
+                      00175 
+                      00176 #define DEVICE_REMOTE_WAKEUP    0x01
+                      00177 #define ENDPOINT_HALT                   0x00
+                      00178 
+                      00179 ;/////////////////////////////////////////////////////////////////////
+                      00180 ;// Interface Descriptor values
+                      00181 ;// bInterfaceClass values
+                      00182 #define USB_HID_CLASS_CODE                  0x03
+                      00183 #define USB_MASS_STORAGE_CLASS_CODE         0x08
+                      00184 #define USB_HUB_CLASS_CODE                  0x09
+                      00185 
+                      00186 ;// bInterfaceSubClass value for HID
+                      00187 #define NO_SUBCLASS                         0x00
+                      00188 #define BOOT_INTERFACE_SUBCLASS             0x01
+                      00189 
+                      00190 ;// bInterfaceSubClass value for MSC
+                      00191 #define RBC_SUBCLASS                        0x01
+                      00192 #define DVD_SUBCLASS                        0x02
+                      00193 #define TAPE_SUBCLASS                       0x03
+                      00194 #define UFI_SUBCLASS                        0x04
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE  5
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00195 #define FDD_SUBCLASS                        0x05
+                      00196 #define SCSI_SUBCLASS                       0x06
+                      00197 
+                      00198 ;// bInterfaceProtocol values for HID
+                      00199 #define PROTOCOL_NONE                       0x00
+                      00200 #define PROTOCOL_KEYBOARD                   0x01
+                      00201 #define PROTOCOL_MOUSE                      0x02
+                      00202 
+                      00009 
+                      00010     errorlevel -302 ; supress "register not in bank0, check page bits" message
+                      00011     errorlevel -303 ; supress "Program word too large.  Truncated to core size." message
+                      00012     errorlevel -305 ; supress "Using default destination of 1 (file)." message
+                      00013 
+                      00014 ; 16MHz HS, 3x PLL, USBLSCLK /6,        Fosc =
+                      00015 
+                      00016 ; CONFIG1
+                      00017 ; __config 0xFC2
+8007   0FC2           00018  __CONFIG _CONFIG1, _FOSC_HS & _WDTE_OFF & _PWRTE_ON & _MCLRE_ON & _CP_OFF & _BOREN_ON & _CLKOUTEN_OFF &
+                             _IESO_OFF & _FCMEN_OFF
+                      00019 ; CONFIG2
+                      00020 ; __config 0x39FF
+8008   39FF           00021  __CONFIG _CONFIG2, _WRT_OFF & _CPUDIV_CLKDIV6 & _USBLSCLK_48MHz & _PLLMULT_3x & _PLLEN_ENABLED & _STVRE
+                            N_OFF & _BORV_HI & _LPBOR_OFF & _LVP_ON
+                      00022 ;*******************************************************
+                      00023 #define RED                 PORTC, RC2    ;RED LED
+                      00024 #define ORANGE              PORTC, RC3    ;ORANGE LED
+                      00025 #define GREEN               PORTC, RC4    ;GREEN LED
+                      00026 #define USBL                0x00            ;          > USB 2.0 <
+                      00027 #define USBH                0x02            ;
+                      00028 #define VIDL                0xD8            ;Microchip > VID 04D8 <
+                      00029 #define VIDH                0x04            ;Microchip
+                      00030 #define PIDL                0x77            ;          > PID cc77 <
+                      00031 #define PIDH                0xcc            ;
+                      00032 #define REVL                0x01            ;          > REV 0001 <
+                      00033 #define REVH                0x00            ;
+                      00034 
+                      00035         udata_shr   0x70 ; - 0x7f
+0070                  00036 Device_State        res     1
+0071                  00037 MaskedInts          res     1
+0072                  00038 ADDR                res     1
+0073                  00039 USB_dev_req         res     1
+0074                  00040 PID                 res     1
+0075                  00041 Data_wLength        res     1
+0076                  00042 DescriptorType      res     1
+0077                  00043 DescriptorIndex     res     1
+0078                  00044 DescriptorLength    res     1
+0079                  00045 IN                  res     1
+007A                  00046 OUT                 res     1
+007B                  00047 EP1_dev_req         res     1
+007C                  00048 COUNT0              res     1
+007D                  00049 COUNT1              res     1
+007E                  00050 TOGGLE              res     1
+                      00051 
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE  6
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00052 
+                      00053 bank7       udata   0x3a0
+03A0                  00054 bConfig             res     1
+03A1                  00055 num_rst             res     1
+03A2                  00056 num_gd              res     1
+03A3                  00057 num_sa              res     1
+03A4                  00058 TEMP0               res     1
+03A5                  00059 TEMP1               res     1
+03A6                  00060 TEMP2               res     1
+03A7                  00061 LEDS                res     1
+03A8                  00062 tc                  res     1
+03A9                  00063 test                res     1
+                      00064 
+                      00065 bank8       udata   0x420
+0420                  00066 SC                  res     1
+0421                  00067 S0                  res     1
+                      00068 
+                      00069 ;===========================================================================
+                      00070                 org 0x0000                              ;Reset vector
+0000   2???           00071                 goto    Main
+                      00072 ;---------------------------------------------------
+                      00073                 org     0x0004                          ;Interrupt Vector
+                      00074 
+0004   003D           00075         banksel UCON
+0005   0810           00076         movfw   UIR
+0006   0512           00077         andwf   UIE,0
+0007   00??           00078         movwf   MaskedInts
+0008   1A00           00079         btfsc   MaskedInts, IDLEIF      ;bus idle
+0009   2???           00080         goto    idle
+000A   1980           00081         btfsc   MaskedInts, TRNIF       ;transaction complete
+000B   2???           00082         goto    tranCom
+000C   1880           00083         btfsc   MaskedInts, UERRIF      ;err
+000D   2???           00084         goto    err
+000E   1800           00085         btfsc   MaskedInts, URSTIF      ;reset
+000F   2???           00086         goto    rset
+0010   0009           00087         retfie                  ;fall through
+                      00088 
+0011   2???           00089 err     call    Red
+                      00090         ;call    Orng
+                      00091         ;call    Grn
+0012   3032           00092         movlw   0x32
+0013   2???           00093         call    Pause
+0014   2???           00094         call    Clr
+0015   3032           00095         movlw   0x32
+0016   2???           00096         call    Pause
+0017   003D           00097         banksel UCON
+0018   0813           00098         movfw   UEIR            ;ERROR!!!!!!
+                      00099         ;call    ShowByte
+0019   2???           00100         goto    exit_int
+                      00101 
+001A   2???           00102 idle    call    Idle
+001B   2???           00103         goto    exit_int
+                      00104 
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE  7
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+001C   2???           00105 tranCom call    ServiceUSB
+001D   2???           00106         goto    exit_int
+                      00107 
+001E   2???           00108 rset    call    USBReset
+001F   2???           00109         goto    exit_int
+                      00110 
+0020                  00111 exit_int
+0020   003D           00112         banksel UCON
+0021   0190           00113         clrf    UIR
+0022   0020           00114         banksel PIR2            ;bank 0
+0023   1112           00115         bcf     PIR2, USBIF
+0024   0009           00116         retfie
+                      00117 ;===========================================================================
+                      00118 ;===========================================================================
+0025                  00119 InitUSB
+0025   3000           00120         movlw   BD0STATL            ;Initialise buffers
+0026   0084           00121         movwf   FSR0L               ;
+0027   0103           00122         clrw                        ;BD0STAT
+0028   001A           00123         movwi   FSR0++
+0029   3040           00124         movlw   MAX_PACKET_SIZE     ;ByteCount
+002A   001A           00125         movwi   FSR0++
+002B   3040           00126         movlw   BD0DATAL            ;bufferL
+002C   001A           00127         movwi   FSR0++
+002D   3020           00128         movlw   BD0DATAH            ;bufferH
+002E   001A           00129         movwi   FSR0++
+002F   0103           00130         clrw                        ;BD1STAT
+0030   001A           00131         movwi   FSR0++
+0031   3040           00132         movlw   MAX_PACKET_SIZE     ;ByteCount
+0032   001A           00133         movwi   FSR0++
+0033   3080           00134         movlw   BD1DATAL            ;bufferL
+0034   001A           00135         movwi   FSR0++
+0035   3020           00136         movlw   BD1DATAH            ;bufferH
+0036   001A           00137         movwi   FSR0++
+0037   0103           00138         clrw                        ;BD2STAT
+0038   001A           00139         movwi   FSR0++
+0039   3002           00140         movlw   OUT_REPORT_SIZE     ;ByteCount
+003A   001A           00141         movwi   FSR0++
+003B   30C0           00142         movlw   BD2DATAL            ;bufferL
+003C   001A           00143         movwi   FSR0++
+003D   3020           00144         movlw   BD2DATAH            ;bufferH
+003E   001A           00145         movwi   FSR0++
+003F   0103           00146         clrw                        ;BD3STAT
+0040   001A           00147         movwi   FSR0++
+0041   3002           00148         movlw   IN_REPORT_SIZE      ;ByteCount
+0042   001A           00149         movwi   FSR0++
+0043   30E0           00150         movlw   BD3DATAL            ;bufferL
+0044   001A           00151         movwi   FSR0++
+0045   3020           00152         movlw   BD3DATAH            ;bufferH
+0046   001A           00153         movwi   FSR0++
+                      00154 
+0047   003D           00155         banksel UCON                ;UCON & all USB special registers
+0048   1611           00156         bsf     UCFG, UPUEN         ;enable pull-ups
+0049   1511           00157         bsf     UCFG, FSEN          ;full speed
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE  8
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+004A   3001           00158         movlw   DEFAULT_STATE       ;start in
+004B   00??           00159         movwf   Device_State        ;default state
+004C   30FF           00160         movlw   NO_REQUEST          ;start with
+004D   00??           00161         movwf   USB_dev_req         ;no requests
+004E   00??           00162         movwf   EP1_dev_req         ;
+                      00163 
+004F   3000           00164         movlw   ENDPT_DISABLED      ;Disable Endpoints
+0050   0098           00165         movwf   UEP0                ;until USBReset
+0051   0099           00166         movwf   UEP1                ;& Set_Config
+                      00167 
+0052   0193           00168         clrf    UEIR                ;clear USB error interrupts
+0053   0190           00169         clrf    UIR                 ;clear USB interrupts
+0054   309F           00170         movlw   b'10011111'         ;all error
+0055   0097           00171         movwf   UEIE                ;interrupts enabled
+0056   3013           00172         movlw   b'00010011'         ;Idle, Errors & USBreset *******
+0057   0092           00173         movwf   UIE                 ;interrupts enabled
+                      00174 
+0058                  00175 pll_bk
+0058   0021           00176         banksel OSCSTAT
+0059   1F1A           00177         btfss   OSCSTAT, PLLRDY     ;wait for PLL
+005A   2???           00178         goto    pll_bk              ;to stabilise
+005B   003D           00179         banksel UCON
+005C   158E           00180         bsf     UCON, USBEN         ;enable USB module
+                      00181 
+005D                  00182 se0_bk
+005D   1A8E           00183         btfsc   UCON, SE0           ;wait for
+005E   2???           00184         goto    se0_bk              ;end of SE0
+005F   178B           00185         bsf     INTCON, GIE
+                      00186 
+0060   0008           00187         return
+                      00188 ;===========================================================================
+0061                  00189 USBReset
+0061   3001           00190         movlw   DEFAULT_STATE       ;change to
+0062   00??           00191         movwf   Device_State        ;default state
+0063   30FF           00192         movlw   NO_REQUEST
+0064   00??           00193         movwf   USB_dev_req
+0065   00??           00194         movwf   EP1_dev_req
+0066   01??           00195         clrf    ADDR
+0067   003D           00196         banksel UCON
+0068   301B           00197         movlw   b'00011011'         ;Idle, Transaction Complete, Errors & USBreset
+0069   0092           00198         movwf   UIE                 ;interrupts enabled
+006A   1190           00199         bcf     UIR, TRNIF          ;clear
+006B   1190           00200         bcf     UIR, TRNIF          ;out
+006C   1190           00201         bcf     UIR, TRNIF          ;USTAT
+006D   0190           00202         clrf    UIR                 ;FIFO
+006E   120E           00203         bcf     UCON, PKTDIS        ;enable next packet
+006F   2???           00204         call    Reset_EP0_OutBuffer ;ready for OUT/SETUP packets
+0070   2???           00205         call    Reset_EP0_InBuffer  ;ready for IN packets
+0071   3016           00206         movlw   ENDPT_CONTROL       ;handshake, control, in/out, clear stall
+0072   0098           00207         movwf   UEP0                ;enable ENDPOINT0
+                      00208 
+0073   2???           00209         call    tRst;<--------------<<<<<<<<<<<<<<<<<<<<<<<<
+0074   2???           00210         call    Clr;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE  9
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0075   0008           00211         return
+                      00212 ;===========================================================================
+0076                  00213 Idle
+0076   0022           00214         banksel LATC    ;store outputs
+0077   080E           00215         movfw   LATC
+0078   018E           00216         clrf    LATC
+0079   002?           00217         banksel LEDS
+007A   00??           00218         movwf   LEDS
+                      00219 
+007B   003D           00220         banksel UCON
+007C   1110           00221         bcf     UIR, ACTVIF         ;clr active flag
+007D   1212           00222         bcf     UIE, IDLEIF         ;disable idle interrupt
+007E   148E           00223         bsf     UCON, SUSPND        ;enter SUSPEND mode
+                      00224 
+007F   1D10           00225         btfss   UIR, ACTVIF         ;wait for
+0080   2???           00226         goto    $-1                 ;bus activity
+                      00227 
+0081   108E           00228         bcf     UCON, SUSPND        ;exit SUSPEND mode
+0082   1210           00229         bcf     UIR, IDLEIF         ;clr idle flag
+0083   1612           00230         bsf     UIE, IDLEIE         ;enable idle interrupt
+0084   1110           00231 act_cf  bcf     UIR, ACTVIF         ;clear bus activity flag
+0085   1910           00232         btfsc   UIR, ACTVIF         ;test and
+0086   2???           00233         goto    act_cf              ;repeat if neccessary
+                      00234 
+0087   002?           00235         banksel LEDS    ;restore outputs
+0088   08??           00236         movfw   LEDS
+0089   0020           00237         banksel PORTC
+008A   008E           00238         movwf   PORTC
+008B   0008           00239         return
+                      00240 ;===========================================================================
+008C                  00241 Reset_EP0_OutBuffer
+008C   3001           00242         movlw   BD0STATL + BYTECOUNT
+008D   0084           00243         movwf   FSR0L
+008E   3040           00244         movlw   MAX_PACKET_SIZE         ;count
+008F   001B           00245         movwi   FSR0--
+0090   0180           00246         clrf    INDF0                   ;clr BD0STAT
+0091   1780           00247         bsf     INDF0, UOWN         ;hand over control to SIE
+0092   0008           00248         return
+                      00249 ;===========================================================================
+0093                  00250 Reset_EP0_InBuffer
+0093   3005           00251         movlw   BD1STATL + BYTECOUNT
+0094   0084           00252         movwf   FSR0L
+0095   3040           00253         movlw   MAX_PACKET_SIZE         ;count
+0096   001B           00254         movwi   FSR0--
+0097   0180           00255         clrf    INDF0                   ;clr BD1STAT
+0098   1780           00256         bsf     INDF0, UOWN         ;hand over control to SIE
+0099   0008           00257         return
+                      00258 ;===========================================================================
+009A                  00259 Reset_EP1_OutBuffer
+009A   3009           00260         movlw   BD2STATL + BYTECOUNT
+009B   0084           00261         movwf   FSR0L
+009C   3002           00262         movlw   OUT_REPORT_SIZE     ;count
+009D   001B           00263         movwi   FSR0--
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 10
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+009E   0180           00264         clrf    INDF0               ;clr BD2STAT
+009F   1780           00265         bsf     INDF0, UOWN     ;hand over control to SIE
+00A0   0008           00266         return
+                      00267 ;===========================================================================
+00A1                  00268 Reset_EP1_InBuffer
+00A1   300D           00269         movlw   BD3STATL + BYTECOUNT
+00A2   0084           00270         movwf   FSR0L
+00A3   3002           00271         movlw   IN_REPORT_SIZE     ;count
+00A4   001B           00272         movwi   FSR0--
+00A5   0180           00273         clrf    INDF0               ;clr BD2STAT
+00A6   1780           00274         bsf     INDF0, UOWN     ;hand over control to SIE
+00A7   0008           00275         return
+                      00276 ;===========================================================================
+00A8                  00277 Stall_EP0_OutBuffer
+00A8   3000           00278         movlw   BD0STATL
+00A9   0084           00279         movwf   FSR0L
+00AA   1500           00280         bsf     INDF0, BSTALL
+00AB   0008           00281         return
+                      00282 ;===========================================================================
+00AC                  00283 Stall_EP0_InBuffer
+00AC   3004           00284         movlw   BD1STATL
+00AD   0084           00285         movwf   FSR0L
+00AE   1500           00286         bsf     INDF0, BSTALL
+00AF   0008           00287         return
+                      00288 ;===========================================================================
+00B0                  00289 Stall_EP1_OutBuffer
+00B0   3008           00290         movlw   BD2STATL
+00B1   0084           00291         movwf   FSR0L
+00B2   1500           00292         bsf     INDF0, BSTALL
+00B3   0008           00293         return
+                      00294 ;===========================================================================
+00B4                  00295 Stall_EP1_InBuffer
+00B4   300C           00296         movlw   BD3STATL
+00B5   0084           00297         movwf   FSR0L
+00B6   1500           00298         bsf     INDF0, BSTALL
+00B7   0008           00299         return
+                      00300 ;===========================================================================
+00B8                  00301 Send_0Len_pkt
+00B8   3004           00302         movlw   BD1STATL        ;IN buffer
+00B9   0084           00303         movwf   FSR0L
+00BA   0180           00304         clrf    INDF0
+00BB   0A84           00305         incf    FSR0L           ;BD1CNT
+00BC   0180           00306         clrf    INDF0           ;zero count
+00BD   0384           00307         decf    FSR0L
+00BE   3048           00308         movlw   0x48            ;data1
+00BF   0080           00309         movwf   INDF0
+00C0   1780           00310         bsf     INDF0, UOWN     ;hand over control to SIE
+00C1   0008           00311         return
+                      00312 ;===========================================================================
+00C2                  00313 SendData
+00C2   3007           00314         movlw   BD1ADRHL        ;Set buffer control registers
+00C3   0084           00315         movwf   FSR0L
+00C4   3020           00316         movlw   BD1DATAH        ; => BD1ADRH
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 11
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+00C5   001B           00317         movwi   FSR0--
+00C6   3080           00318         movlw   BD1DATAL        ; => BD1ADRL
+00C7   001B           00319         movwi   FSR0--
+00C8   08??           00320         movfw   Data_wLength    ; => BD1CNT
+00C9   001B           00321         movwi   FSR0--
+00CA   3048           00322         movlw   0x48            ;data1 => BD1STAT
+00CB   0080           00323         movwf   INDF0
+00CC   1780           00324         bsf     INDF0, UOWN     ;hand over control to SIE
+00CD   0008           00325         return
+                      00326 ;===========================================================================
+00CE                  00327 Init_TMR2
+00CE   0020           00328         banksel TMR2
+00CF   307F           00329         movlw   0x7f        ;postscaler 16, prescaler 64
+00D0   009C           00330         movwf   T2CON
+00D1   30FF           00331         movlw   0xff;0x4d        ;
+00D2   009B           00332         movwf   PR2         ;period register
+00D3   019A           00333         clrf    TMR2
+00D4   1091           00334         bcf     PIR1, TMR2IF
+00D5   0008           00335         return
+                      00336 ;===========================================================================
+00D6                  00337 Main
+00D6   170B           00338         bsf     INTCON, PEIE            ;enable peripheral interupts
+00D7   018E           00339         clrf    PORTC                   ;clear outputs
+00D8   0023           00340         banksel ANSELC
+00D9   018E           00341         clrf    ANSELC
+00DA   0021           00342         banksel TRISC                   ;TRISC, PIE2, OPTION_REG
+00DB   1512           00343         bsf     PIE2, USBIE             ;enable USB interupts
+00DC   110E           00344         bcf     TRISC, TRISC2           ;RC2 out
+00DD   118E           00345         bcf     TRISC, TRISC3           ;RC3 out
+00DE   120E           00346         bcf     TRISC, TRISC4           ;RC4 out
+00DF   168E           00347         bsf     TRISC, TRISC5           ;RC5 in
+00E0   1719           00348         bsf     OSCCON, SPLLMULT        ;3x
+00E1   1395           00349         bcf     OPTION_REG, NOT_WPUEN   ;enable pull-ups
+00E2   3020           00350         movlw   BD0STATH
+00E3   0085           00351         movwf   FSR0H
+00E4   2???           00352         call    InitTest;<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+00E5   2???           00353         call    Init_TMR2
+00E6   2???           00354         call    InitUSB
+                      00355 
+00E7                  00356 loop_bk
+00E7   3003           00357         movlw   CONFIG_STATE
+00E8   06??           00358         xorwf   Device_State,0
+00E9   1D03           00359         btfss   STATUS,Z
+00EA   2???           00360         goto    loop_bk                 ; rpt forever
+                      00361 
+00EB   0020           00362         banksel PIR1                    ;if configured perform
+00EC   1C91           00363         btfss   PIR1, TMR2IF            ;interrupt transfers
+00ED   2???           00364         goto    loop_bk                 ;
+00EE   0020           00365         banksel PORTC
+00EF   080E           00366         movfw   PORTC                   ;read PORTC
+00F0   00??           00367         movwf   IN
+00F1   2???           00368         call    send_data_int           ;interrupt IN transfer
+00F2   1091           00369         bcf     PIR1, TMR2IF
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 12
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+00F3   2???           00370         goto    loop_bk
+                      00371 ;===========================================================================
+                      00372 ;===========================================================================
+00F4                  00373 ServiceUSB
+                      00374 ;        call    TLog;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+                      00375 
+00F4   003D           00376         banksel UCON
+00F5   3078           00377         movlw   0x78                ;ENDP mask
+00F6   050F           00378         andwf   USTAT,0
+00F7   1D03           00379         btfss   STATUS,Z            ;check endpoint
+00F8   2???           00380         goto    EP_1
+00F9   3004           00381 EP_0    movlw   0x04                ;DIR mask
+00FA   050F           00382         andwf   USTAT,0
+00FB   1D03           00383         btfss   STATUS,Z            ;check Direction
+00FC   2???           00384         goto    EP0_In
+                      00385 
+00FD                  00386 EP0_Out
+00FD   3000           00387         movlw   BD0STATL            ;BD0STAT
+00FE   0084           00388         movwf   FSR0L
+00FF   303C           00389         movlw   0x3c                ;PID mask
+0100   0500           00390         andwf   INDF0,0
+0101   00??           00391         movwf   PID                 ;store PID
+                      00392 
+0102   3034           00393         movlw   TOKEN_SETUP         ;setup packet
+0103   06??           00394         xorwf   PID,0
+0104   1903           00395         btfsc   STATUS,Z
+0105   2???           00396         call    Setup
+0106   3004           00397         movlw   TOKEN_OUT           ;host sending data
+0107   06??           00398         xorwf   PID,0
+0108   1903           00399         btfsc   STATUS,Z
+0109   2???           00400         call    Out
+010A   0008           00401         return
+                      00402 
+010B                  00403 EP0_In
+010B   3004           00404         movlw   BD1STATL            ;BD1STAT
+010C   0084           00405         movwf   FSR0L
+010D   303C           00406         movlw   0x3c                ;PID mask
+010E   0500           00407         andwf   INDF0,0
+010F   00??           00408         movwf   PID                 ;store PID
+                      00409 
+0110   3024           00410         movlw   TOKEN_IN            ;host requests data
+0111   06??           00411         xorwf   PID,0
+0112   1903           00412         btfsc   STATUS,Z
+0113   2???           00413         call    In
+0114   0008           00414         return
+                      00415 
+                      00416 ;===========================================================================
+                      00417 ;       SETUP   TOKEN
+                      00418 ;===========================================================================
+0115                  00419 Setup
+0115   3040           00420         movlw   BD0DATAL            ;bmRequestType
+0116   0084           00421         movwf   FSR0L
+                      00422 
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 13
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0117   3060           00423         movlw   0x60        ;request type mask
+0118   0500           00424         andwf   INDF0,w
+0119   3A20           00425         xorlw   CLASS
+011A   1903           00426         btfsc   STATUS,Z
+011B   2???           00427         goto    ClassSpecificRequest
+                      00428 
+011C   3000           00429         movlw   HOSTTODEVICE        ;standard requests
+011D   0600           00430         xorwf   INDF0,0
+011E   1903           00431         btfsc   STATUS,Z
+011F   2???           00432         goto    HostToDevice
+0120   3080           00433         movlw   DEVICETOHOST
+0121   0600           00434         xorwf   INDF0,0
+0122   1903           00435         btfsc   STATUS,Z
+0123   2???           00436         goto    DeviceToHost
+0124   3001           00437         movlw   HOSTTOINTERFACE
+0125   0600           00438         xorwf   INDF0,0
+0126   1903           00439         btfsc   STATUS,Z
+0127   2???           00440         goto    HostToInterface
+0128   3081           00441         movlw   INTERFACETOHOST
+0129   0600           00442         xorwf   INDF0,0
+012A   1903           00443         btfsc   STATUS,Z
+012B   2???           00444         goto    InterfaceToHost
+012C   3002           00445         movlw   HOSTTOENDPOINT
+012D   0600           00446         xorwf   INDF0,0
+012E   1903           00447         btfsc   STATUS,Z
+012F   2???           00448         goto    HostToEndpoint
+0130   3082           00449         movlw   ENDPOINTTOHOST
+0131   0600           00450         xorwf   INDF0,0
+0132   1903           00451         btfsc   STATUS,Z
+0133   2???           00452         goto    EndpointToHost
+0134   2???           00453         goto    su_exit
+                      00454 ;-----------------------------------------------------------
+0135                  00455 HostToDevice
+0135   3041           00456         movlw   BD0DATAL + bRequest ;bRequest
+0136   0084           00457         movwf   FSR0L
+                      00458 
+0137   3001           00459         movlw   CLEAR_FEATURE       ;
+0138   0600           00460         xorwf   INDF0,0
+0139   1903           00461         btfsc   STATUS,Z
+013A   2???           00462         call    ClearFeature
+013B   3003           00463         movlw   SET_FEATURE         ;
+013C   0600           00464         xorwf   INDF0,0
+013D   1903           00465         btfsc   STATUS,Z
+013E   2???           00466         call    SetFeature
+013F   3005           00467         movlw   SET_ADDRESS         ;
+0140   0600           00468         xorwf   INDF0,0
+0141   1903           00469         btfsc   STATUS,Z
+0142   2???           00470         call    SetAddress
+0143   3007           00471         movlw   SET_DESCRIPTOR      ;
+0144   0600           00472         xorwf   INDF0,0
+0145   1903           00473         btfsc   STATUS,Z
+0146   2???           00474         call    SetDescriptor
+0147   3009           00475         movlw   SET_CONFIGURATION   ;
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 14
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0148   0600           00476         xorwf   INDF0,0
+0149   1903           00477         btfsc   STATUS,Z
+014A   2???           00478         call    SetConfiguration
+014B   2???           00479         goto    su_exit
+                      00480 ;-----------------------------------------------------------
+014C                  00481 DeviceToHost
+014C   3041           00482         movlw   BD0DATAL + bRequest  ;bRequest
+014D   0084           00483         movwf   FSR0L
+                      00484 
+014E   3000           00485         movlw   GET_STATUS          ;
+014F   0600           00486         xorwf   INDF0,0
+0150   1903           00487         btfsc   STATUS,Z
+0151   2???           00488         call    GetStatus
+0152   3006           00489         movlw   GET_DESCRIPTOR      ;
+0153   0600           00490         xorwf   INDF0,0
+0154   1903           00491         btfsc   STATUS,Z
+0155   2???           00492         call    GetDescriptor
+0156   3008           00493         movlw   GET_CONFIGURATION   ;
+0157   0600           00494         xorwf   INDF0,0
+0158   1903           00495         btfsc   STATUS,Z
+0159   2???           00496         call    GetConfiguration
+015A   2???           00497         goto    su_exit
+                      00498 ;-----------------------------------------------------------
+015B                  00499 HostToInterface
+015B   3041           00500         movlw   BD0DATAL + bRequest  ;bRequest
+015C   0084           00501         movwf   FSR0L
+                      00502 
+015D   3001           00503         movlw   CLEAR_FEATURE       
+015E   0600           00504         xorwf   INDF0,0
+015F   1903           00505         btfsc   STATUS,Z
+0160   2???           00506         call    ClearInterfaceFeature
+0161   3003           00507         movlw   SET_FEATURE         
+0162   0600           00508         xorwf   INDF0,0
+0163   1903           00509         btfsc   STATUS,Z
+0164   2???           00510         call    SetInterfaceFeature
+0165   300B           00511         movlw   SET_INTERFACE       
+0166   0600           00512         xorwf   INDF0,0
+0167   1903           00513         btfsc   STATUS,Z
+0168   2???           00514         call    SetInterface
+0169   2???           00515         goto    su_exit
+                      00516 ;-----------------------------------------------------------
+016A                  00517 InterfaceToHost
+016A   3041           00518         movlw   BD0DATAL + bRequest  ;bRequest
+016B   0084           00519         movwf   FSR0L
+                      00520 
+016C   3000           00521         movlw   GET_STATUS          
+016D   0600           00522         xorwf   INDF0,0
+016E   1903           00523         btfsc   STATUS,Z
+016F   2???           00524         call    GetInterfaceStatus
+0170   3006           00525         movlw   GET_DESCRIPTOR
+0171   0600           00526         xorwf   INDF0,0
+0172   1903           00527         btfsc   STATUS,Z
+0173   2???           00528         call    GetDescriptor
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 15
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0174   300A           00529         movlw   GET_INTERFACE       
+0175   0600           00530         xorwf   INDF0,0
+0176   1903           00531         btfsc   STATUS,Z
+0177   2???           00532         call    GetInterface      
+0178   2???           00533         goto    su_exit
+                      00534 ;-----------------------------------------------------------
+0179                  00535 HostToEndpoint
+0179   3041           00536         movlw   BD0DATAL + bRequest  ;bRequest
+017A   0084           00537         movwf   FSR0L
+                      00538 
+017B   3001           00539         movlw   CLEAR_FEATURE       
+017C   0600           00540         xorwf   INDF0,0
+017D   1903           00541         btfsc   STATUS,Z
+017E   2???           00542         call    ClearEndpointFeature
+017F   3003           00543         movlw   SET_FEATURE         
+0180   0600           00544         xorwf   INDF0,0
+0181   1903           00545         btfsc   STATUS,Z
+0182   2???           00546         call    SetEndpointFeature
+0183   2???           00547         goto    su_exit
+                      00548 ;-----------------------------------------------------------
+0184                  00549 EndpointToHost
+0184   3041           00550         movlw   BD0DATAL + bRequest  ;bRequest
+0185   0084           00551         movwf   FSR0L
+                      00552 
+0186   3000           00553         movlw   GET_STATUS          
+0187   0600           00554         xorwf   INDF0,0
+0188   1903           00555         btfsc   STATUS,Z
+0189   2???           00556         call    GetEndpointStatus
+018A   300C           00557         movlw   SYNCH_FRAME         
+018B   0600           00558         xorwf   INDF0,0
+018C   1903           00559         btfsc   STATUS,Z
+018D   2???           00560         call    EpSynchFrame       
+018E   2???           00561         goto    su_exit
+                      00562 ;-----------------------------------------------------------
+018F   2???           00563 su_exit call    Reset_EP0_OutBuffer
+0190   003D           00564         banksel UCON
+0191   120E           00565         bcf     UCON, PKTDIS    ;enable next packet
+0192   1190           00566         bcf     UIR, TRNIF
+0193   0008           00567         return
+                      00568 ;===========================================================================
+                      00569 ;       IN   TOKEN
+                      00570 ;===========================================================================
+0194                  00571 In       
+0194   3005           00572         movlw   SET_ADDRESS     ;check if 
+0195   06??           00573         xorwf   USB_dev_req,0   ;SET_ADDRESS
+0196   1903           00574         btfsc   STATUS,Z        ;is in progress
+0197   2???           00575         call    WriteAddr
+0198   2???           00576         call    Reset_EP0_InBuffer
+0199   0008           00577         return
+                      00578 ;===========================================================================
+                      00579 ;       OUT   TOKEN
+                      00580 ;===========================================================================
+019A                  00581 Out
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 16
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+019A   3009           00582         movlw   SET_REPORT      ;check if
+019B   06??           00583         xorwf   USB_dev_req,0   ;SET_REPORT
+019C   1903           00584         btfsc   STATUS,Z        ;is in progress
+019D   2???           00585         call    StoreReport
+019E   30FF           00586         movlw   NO_REQUEST
+019F   00??           00587         movwf   USB_dev_req
+01A0   2???           00588         call    Reset_EP0_OutBuffer
+01A1   0008           00589         return
+                      00590 ;===========================================================================
+                      00591 ;===========================================================================
+                      00592 ;           Standard Requests - Device
+                      00593 ;===========================================================================
+01A2                  00594 GetStatus                                   ;(0x00)
+01A2   3080           00595         movlw   BD1DATAL
+01A3   0084           00596         movwf   FSR0L
+01A4   3001           00597         movlw   DEVICE_REMOTE_WAKEUP    ;statusL
+01A5   0012           00598         moviw   FSR0++
+01A6   3000           00599         movlw   0x00                    ;statusH
+01A7   0080           00600         movwf   INDF0
+                      00601 
+01A8   3002           00602         movlw   0x02                    ;byte count
+01A9   00??           00603         movwf   Data_wLength
+01AA   2???           00604         call    SendData
+                      00605 
+01AB   3000           00606         movlw   GET_STATUS       ;
+01AC   00??           00607         movwf   USB_dev_req
+01AD   0008           00608         return
+                      00609 ;===========================================================================
+01AE                  00610 ClearFeature                                ;(0x01)
+01AE   2???           00611         call    Stall_EP0_InBuffer
+01AF   0008           00612         return
+                      00613 ;===========================================================================
+01B0                  00614 SetFeature                                  ;(0x03)
+01B0   2???           00615         call    Stall_EP0_InBuffer
+01B1   0008           00616         return
+                      00617 ;===========================================================================
+01B2                  00618 SetAddress                                  ;(0x05)
+01B2   2???           00619         call    Send_0Len_pkt
+01B3   3042           00620         movlw   BD0DATAL + wValue
+01B4   0084           00621         movwf   FSR0L
+01B5   0800           00622         movfw   INDF0
+01B6   00??           00623         movwf   ADDR                ;store address
+01B7   3005           00624         movlw   SET_ADDRESS
+01B8   00??           00625         movwf   USB_dev_req
+01B9   0008           00626         return
+01BA                  00627 WriteAddr
+01BA   08??           00628         movfw   ADDR                ;write
+01BB   003D           00629         banksel UCON                ;address
+01BC   0096           00630         movwf   UADDR               ;to UADDR
+01BD   01??           00631         clrf    ADDR
+01BE   3002           00632         movlw   ADDRESS_STATE
+01BF   00??           00633         movwf   Device_State        ;set ADDRESSED!!!
+01C0   30FF           00634         movlw   NO_REQUEST          ;clear
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 17
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+01C1   00??           00635         movwf   USB_dev_req         ;request state
+01C2   2???           00636         call    incSA;<------------------<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+01C3   0008           00637         return
+                      00638 ;===========================================================================
+                      00639 ; GetDescriptor in Descriptors.inc
+                      00640 ;===========================================================================
+01C4                  00641 SetDescriptor                               ;(0x07) not supported
+01C4   2???           00642         call    Stall_EP0_InBuffer
+01C5   0008           00643         return
+                      00644 ;===========================================================================
+01C6                  00645 GetConfiguration                            ;(0x08)
+01C6   3080           00646         movlw   BD1DATAL
+01C7   0084           00647         movwf   FSR0L
+01C8   3001           00648         movlw   0x01            ;configured
+01C9   0080           00649         movwf   INDF0
+01CA   3003           00650         movlw   CONFIG_STATE    ;check if
+01CB   06??           00651         xorwf   Device_State,0  ;configured
+01CC   1D03           00652         btfss   STATUS,Z        ;If not
+01CD   0180           00653         clrf    INDF0           ;send zero
+                      00654 
+01CE   3001           00655         movlw   0x01            ;byte count
+01CF   00??           00656         movwf   Data_wLength
+01D0   2???           00657         call    SendData
+                      00658 
+01D1   3008           00659         movlw   GET_CONFIGURATION       ;
+01D2   00??           00660         movwf   USB_dev_req
+01D3   0008           00661         return
+                      00662 ;===========================================================================
+01D4                  00663 SetConfiguration            ;(0x09)
+01D4   3042           00664         movlw   BD0DATAL + wValue   ;if wValue
+01D5   0084           00665         movwf   FSR0                ;contains 1,
+01D6   3001           00666         movlw   0x01                ;set configured
+01D7   0600           00667         xorwf   INDF0,0
+01D8   1903           00668         btfsc   STATUS,Z
+01D9   2???           00669         goto    configured
+01DA   2???           00670         call    Stall_EP0_InBuffer   ;not configured
+01DB   0008           00671         return
+                      00672 
+01DC                  00673 configured
+01DC   2???           00674         call    Send_0Len_pkt
+01DD   003D           00675         banksel UCON
+01DE   301E           00676         movlw   ENDPT_NON_CONTROL   ;handshake, in/out, clear stall <<<<<<<<<<
+01DF   0099           00677         movwf   UEP1                ;enable ENDPOINT1
+01E0   2???           00678         call    Reset_EP1_OutBuffer
+                      00679 ;        call    Stall_EP1_InBuffer
+01E1   3003           00680         movlw   CONFIG_STATE
+01E2   00??           00681         movwf   Device_State        ;**** CONFIGURED!!!!!!!!!!
+01E3   2???           00682         call    Orng;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+01E4   2???           00683         call    setConf;<-----------------------------<<<<<<<<<<<<<<<<<<<<<<<
+01E5   0008           00684         return
+                      00685 ;===========================================================================
+                      00686 ;           Standard Requests - Interface
+                      00687 ;===========================================================================
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 18
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+01E6                  00688 GetInterfaceStatus                          ;(0x00)
+01E6   3080           00689         movlw   BD1DATAL
+01E7   0084           00690         movwf   FSR0L
+01E8   3000           00691         movlw   0x00            ;reserved
+01E9   0012           00692         moviw   FSR0++
+01EA   3000           00693         movlw   0x00            ;reserved
+01EB   0080           00694         movwf   INDF0
+                      00695 
+01EC   3002           00696         movlw   0x02            ;byte count
+01ED   00??           00697         movwf   Data_wLength
+01EE   2???           00698         call    SendData
+                      00699 
+01EF   3000           00700         movlw   GET_STATUS       
+01F0   00??           00701         movwf   USB_dev_req
+01F1   0008           00702         return
+                      00703 ;===========================================================================
+01F2                  00704 ClearInterfaceFeature                       ;(0x01)
+01F2   2???           00705         call    Stall_EP0_InBuffer
+01F3   0008           00706         return
+                      00707 ;===========================================================================
+01F4                  00708 SetInterfaceFeature                         ;(0x03)
+01F4   2???           00709         call    Stall_EP0_InBuffer
+01F5   0008           00710         return
+                      00711 ;===========================================================================
+01F6                  00712 ifGetDescriptor;<<<<<<<<<<<<<<<<
+01F6   2???           00713         call    Stall_EP0_InBuffer
+01F7   0008           00714         return
+                      00715 ;===========================================================================
+01F8                  00716 GetInterface                                ;(0x0A)
+01F8   3044           00717         movlw   BD0DATAL + wIndex   ;wIndex contains
+01F9   0084           00718         movwf   FSR0                ;interface nummber
+01FA   0880           00719         movf    INDF0
+01FB   1903           00720         btfsc   STATUS,Z
+01FC   2???           00721         goto    send_bAlternate
+01FD   2???           00722         call    Stall_EP0_InBuffer
+01FE   0008           00723         return
+01FF                  00724 send_bAlternate
+01FF   3080           00725         movlw   BD1DATAL
+0200   0084           00726         movwf   FSR0L
+0201   3000           00727         movlw   0x00            ;only interface
+0202   0012           00728         moviw   FSR0++
+                      00729 
+0203   3001           00730         movlw   0x01            ;byte count
+0204   00??           00731         movwf   Data_wLength
+0205   2???           00732         call    SendData
+0206   300A           00733         movlw   GET_INTERFACE
+0207   00??           00734         movwf   USB_dev_req
+0208   0008           00735         return
+                      00736 ;===========================================================================
+0209                  00737 SetInterface                                ;(0x11)
+0209   2???           00738         call    Stall_EP0_InBuffer
+020A   0008           00739         return
+                      00740 ;===========================================================================
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 19
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00741 ;           Standard Requests - Endpoint
+                      00742 ;===========================================================================
+020B                  00743 GetEndpointStatus                           ;(0x00)
+020B   3080           00744         movlw   BD1DATAL
+020C   0084           00745         movwf   FSR0L
+020D   3000           00746         movlw   0x00            ;reserved
+020E   0012           00747         moviw   FSR0++
+020F   3000           00748         movlw   0x00            ;dir & endpoint
+0210   0080           00749         movwf   INDF0
+                      00750 
+0211   3002           00751         movlw   0x02            ;byte count
+0212   00??           00752         movwf   Data_wLength
+0213   2???           00753         call    SendData
+                      00754 
+0214   3000           00755         movlw   GET_STATUS      
+0215   00??           00756         movwf   USB_dev_req
+0216   0008           00757         return
+                      00758 ;===========================================================================
+0217                  00759 ClearEndpointFeature                        ;(0x01)
+0217   2???           00760         call    Stall_EP0_InBuffer
+0218   0008           00761         return
+                      00762 ;===========================================================================
+0219                  00763 SetEndpointFeature                          ;(0x03)
+0219   2???           00764         call    Stall_EP0_InBuffer
+021A   0008           00765         return
+                      00766 ;===========================================================================
+021B                  00767 EpSynchFrame                                ;(0x12)
+021B   2???           00768         call    Stall_EP0_InBuffer
+021C   0008           00769         return
+                      00770 ;===========================================================================
+                      00771 ;                       HID requests
+                      00772 ;===========================================================================
+021D                  00773 ClassSpecificRequest ;(HID)
+021D   3041           00774         movlw   BD0DATAL + bRequest  ;bRequest
+021E   0084           00775         movwf   FSR0L
+                      00776 
+021F   3001           00777         movlw   GET_REPORT
+0220   0600           00778         xorwf   INDF0,0
+0221   1903           00779         btfsc   STATUS,Z
+0222   2???           00780         goto    GetReport
+0223   3002           00781         movlw   GET_IDLE
+0224   0600           00782         xorwf   INDF0,0
+0225   1903           00783         btfsc   STATUS,Z
+0226   2???           00784         goto    GetIdle
+0227   3003           00785         movlw   GET_PROTOCOL
+0228   0600           00786         xorwf   INDF0,0
+0229   1903           00787         btfsc   STATUS,Z
+022A   2???           00788         goto    GetProtocol
+022B   3009           00789         movlw   SET_REPORT
+022C   0600           00790         xorwf   INDF0,0
+022D   1903           00791         btfsc   STATUS,Z
+022E   2???           00792         goto    SetReport
+022F   300A           00793         movlw   SET_IDLE
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 20
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0230   0600           00794         xorwf   INDF0,0
+0231   1903           00795         btfsc   STATUS,Z
+0232   2???           00796         goto    SetIdle
+0233   300B           00797         movlw   SET_PROTOCOL
+0234   0600           00798         xorwf   INDF0,0
+0235   1903           00799         btfsc   STATUS,Z
+0236   2???           00800         goto    SetProtocol
+0237                  00801 fallthrough                     ;shouldn't reach here
+0237   2???           00802         goto    su_exit
+                      00803 ;-----------------------------------------------------------
+0238                  00804 GetReport                                   ;(0x01)
+0238   3042           00805         movlw   BD0DATAL + wValue   ;
+0239   0084           00806         movwf   FSR0L
+023A   0012           00807         moviw   FSR0++
+023B   00??           00808         movwf   DescriptorIndex     ;wValue => Index
+023C   0800           00809         movfw   INDF0
+023D   00??           00810         movwf   DescriptorType      ;wValueHigh => Type
+023E   3046           00811         movlw   BD0DATAL + wLength
+023F   0084           00812         movwf   FSR0L
+0240   0800           00813         movfw   INDF0
+0241   00??           00814         movwf   Data_wLength        ;wLength => max length
+                      00815 
+0242   3001           00816         movlw   REPORT_TYPE_INPUT
+0243   06??           00817         xorwf   DescriptorType,0
+0244   1903           00818         btfsc   STATUS,Z
+0245   2???           00819         goto    getInputReport
+0246   3003           00820         movlw   REPORT_TYPE_FEATURE
+0247   06??           00821         xorwf   DescriptorType,0
+0248   1903           00822         btfsc   STATUS,Z
+0249   2???           00823         goto    getFeatureReport
+024A   2???           00824         call    Stall_EP0_InBuffer
+024B   2???           00825         goto    su_exit
+                      00826 
+024C                  00827 getInputReport
+024C   3080           00828         movlw   BD1DATAL
+024D   0084           00829         movwf   FSR0L
+024E   002?           00830         banksel IN
+024F   08??           00831         movfw   IN              ;  DATA: DEVICE TO HOST
+0250   001A           00832         movwi   FSR0++
+                      00833 
+0251   3001           00834         movlw   0x01            ;byte count
+0252   00??           00835         movwf   Data_wLength
+0253   2???           00836         call    SendData
+                      00837 
+0254   3001           00838         movlw   GET_REPORT
+0255   00??           00839         movwf   USB_dev_req
+0256   2???           00840         goto    su_exit
+                      00841 
+0257                  00842 getFeatureReport
+0257   2???           00843         call    Stall_EP0_InBuffer
+0258   2???           00844         goto    su_exit
+                      00845 ;===========================================================================
+0259                  00846 GetIdle                                     ;(0x02)
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 21
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0259   2???           00847         call    Stall_EP0_InBuffer
+025A   2???           00848         goto    su_exit
+                      00849 ;===========================================================================
+025B                  00850 GetProtocol                                 ;(0x03)
+025B   2???           00851         call    Stall_EP0_InBuffer
+025C   2???           00852         goto    su_exit
+                      00853 ;===========================================================================
+025D                  00854 SetReport                                   ;(0x09)
+025D   3009           00855         movlw   SET_REPORT
+025E   00??           00856         movwf   USB_dev_req
+025F   2???           00857         goto    su_exit
+0260                  00858 StoreReport
+0260   3040           00859         movlw   BD0DATAL
+0261   0084           00860         movwf   FSR0L
+0262   0012           00861         moviw   FSR0++
+0263   00??           00862         movwf   OUT
+0264   2???           00863         call    Send_0Len_pkt
+0265   0008           00864         return
+                      00865 ;===========================================================================
+0266                  00866 SetIdle                                     ;(0x0a) ^^^^^^^^^^TODO^^^^^^^^^^^^^^^^
+0266   2???           00867         call    Stall_EP0_InBuffer
+                      00868 ;        call    Send_0Len_pkt
+0267   2???           00869         goto    su_exit
+                      00870 ;===========================================================================
+0268                  00871 SetProtocol                                 ;(0x0b)
+0268   2???           00872         call    Send_0Len_pkt
+0269   2???           00873         goto    su_exit
+                      00874 ;===========================================================================
+026A                  00875 send_data_int                               ;put output data into EP1 IN buffer
+026A   2???           00876         call    Grn;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+026B   30FF           00877         movlw   NO_REQUEST                  ;check
+026C   06??           00878         xorwf   EP1_dev_req,0               ;EP1
+026D   1D03           00879         btfss   STATUS,Z                    ;not busy
+026E   0008           00880         return
+026F   30E0           00881         movlw   BD3DATAL
+0270   0084           00882         movwf   FSR0L               
+0271   08??           00883         movfw   IN              ; data
+0272   001A           00884         movwi   FSR0++
+                      00885 
+0273   300D           00886         movlw   BD3CNTL         ;
+0274   0084           00887         movwf   FSR0L
+0275   3001           00888         movlw   0x01            ; => BD3CNT
+0276   001B           00889         movwi   FSR0--
+                      00890 
+0277   3000           00891         movlw   0x00            ;set DTSEN => BD1STAT
+0278   0080           00892         movwf   INDF0
+0279   1800           00893         btfsc   TOGGLE,0
+027A   1700           00894         bsf     INDF0,DTS
+                      00895 
+027B   1780           00896         bsf     INDF0,UOWN      ;hand over control to SIE
+027C   30FB           00897         movlw   INT_IN
+027D   00??           00898         movwf   EP1_dev_req
+027E   0A??           00899         incf    TOGGLE
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 22
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+027F   0008           00900         return
+                      00901 ;==========================================
+                      00902 ;   >>>>>>>>>>>  EP1  <<<<<<<<<<<<                                                                      
+                            >>>>>> EP1 <<<<<<
+                      00903 ;==========================================                                     ========================
+                            =====================================
+0280                  00904 EP_1
+0280   003D           00905         banksel UCON
+0281   3004           00906         movlw   0x04                ;DIR mask
+0282   050F           00907         andwf   USTAT,0
+0283   1903           00908         btfsc   STATUS,Z            ;check Direction
+0284   2???           00909         goto    EP1_Out
+                      00910 
+0285                  00911 EP1_In
+0285   30FF           00912         movlw   NO_REQUEST
+0286   00??           00913         movwf   EP1_dev_req
+0287   2???           00914         call    _Grn;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+0288   0008           00915         return
+                      00916 ;---------------------------------------------------
+0289                  00917 EP1_Out
+0289   2???           00918         call    Red;<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+028A   2???           00919         call    Reset_EP1_OutBuffer
+028B   30FF           00920         movlw   NO_REQUEST
+028C   00??           00921         movwf   EP1_dev_req
+028D   0008           00922         return
+                      00923 ;*****************************************************
+                      00924     #include "Descriptors.inc"
+028E                  00001 GetDescriptor                   ;(0x06)
+028E   2???           00002         call    incGD;<-----------<<<<<<<<<<
+028F   3006           00003         movlw   GET_DESCRIPTOR
+0290   00??           00004         movwf   USB_dev_req         ;set current request
+                      00005 
+0291   3042           00006         movlw   BD0DATAL + wValue   ;get descriptor type/index from SETUP packet
+0292   0084           00007         movwf   FSR0L
+0293   0012           00008         moviw   FSR0++
+0294   00??           00009         movwf   DescriptorIndex     ;wValue => Index
+0295   0800           00010         movfw   INDF0
+0296   00??           00011         movwf   DescriptorType      ;wValueHigh => Type
+0297   3046           00012         movlw   BD0DATAL + wLength
+0298   0084           00013         movwf   FSR0L
+0299   0800           00014         movfw   INDF0
+029A   00??           00015         movwf   Data_wLength        ;wLength => max length
+                      00016 
+029B   3080           00017         movlw   BD1DATAL            ;setup
+029C   0084           00018         movwf   FSR0L               ;FSR0
+                      00019 
+029D   01??           00020         clrf    DescriptorLength    ;get selected descriptor data
+029E   3001           00021         movlw   DEVICE          
+029F   06??           00022         xorwf   DescriptorType,0
+02A0   1903           00023         btfsc   STATUS,Z
+02A1   2???           00024         call    DeviceDescriptor
+02A2   3002           00025         movlw   CONFIGURATION
+02A3   06??           00026         xorwf   DescriptorType,0
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 23
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+02A4   1903           00027         btfsc   STATUS,Z
+02A5   2???           00028         call    ConfigurationDescriptor
+02A6   3003           00029         movlw   STRING
+02A7   06??           00030         xorwf   DescriptorType,0
+02A8   1903           00031         btfsc   STATUS,Z
+02A9   2???           00032         call    StringDescriptor
+02AA   3004           00033         movlw   INTERFACE
+02AB   06??           00034         xorwf   DescriptorType,0
+02AC   1903           00035         btfsc   STATUS,Z
+02AD   2???           00036         call    InterfaceDescriptor
+02AE   3005           00037         movlw   ENDPOINT
+02AF   06??           00038         xorwf   DescriptorType,0
+02B0   1903           00039         btfsc   STATUS,Z
+02B1   2???           00040         call    EndpointDescriptor
+02B2   3021           00041         movlw   HID
+02B3   06??           00042         xorwf   DescriptorType,0
+02B4   1903           00043         btfsc   STATUS,Z
+02B5   2???           00044         call    HIDDescriptor
+02B6   3022           00045         movlw   REPORT
+02B7   06??           00046         xorwf   DescriptorType,0
+02B8   1903           00047         btfsc   STATUS,Z
+02B9   2???           00048         call    ReportDescriptor
+                      00049 
+02BA   08??           00050         movf    DescriptorLength    ;test for fallthrough
+02BB   1D03           00051         btfss   STATUS,Z
+02BC   2???           00052         goto    sendD
+02BD   3004           00053 unSupp  movlw   BD1STATL            ;unsupported:
+02BE   0084           00054         movwf   FSR0L               ;enable STALL
+02BF   1500           00055         bsf     INDF0, BSTALL       ;on IN buffer
+02C0   0008           00056         return
+                      00057 
+02C1   08??           00058 sendD   movfw   DescriptorLength    ;If requested length
+02C2   02??           00059         subwf   Data_wLength,0      ;is longer than
+02C3   08??           00060         movfw   DescriptorLength    ;descriptor length,
+02C4   1803           00061         btfsc   STATUS,C            ;set Data_wLength to
+02C5   00??           00062         movwf   Data_wLength        ;length of descriptor
+                      00063 
+02C6   3007           00064         movlw   BD1ADRHL        ;Set buffer control registers
+02C7   0084           00065         movwf   FSR0L
+02C8   3020           00066         movlw   BD1DATAH        ; => BD1ADRH
+02C9   001B           00067         movwi   FSR0--
+02CA   3080           00068         movlw   BD1DATAL        ; => BD1ADRL
+02CB   001B           00069         movwi   FSR0--
+02CC   08??           00070         movfw   Data_wLength    ; => BD1CNT
+02CD   001B           00071         movwi   FSR0--
+02CE   3048           00072         movlw   0x48            ;data1 => BD1STAT
+02CF   0080           00073         movwf   INDF0
+02D0   1780           00074         bsf     INDF0, UOWN     ;hand over control to SIE
+02D1   0008           00075         return
+                      00076 ;--------------------------------------------------------------
+02D2                  00077 DeviceDescriptor
+02D2   3012           00078         movlw   DEVDESCBC           ; bLength
+02D3   001A           00079         movwi   FSR0++
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 24
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+02D4   3001           00080         movlw   DEVICE              ; bDescriptorType
+02D5   001A           00081         movwi   FSR0++
+02D6   3000           00082         movlw   USBL                ; bcdUSB (low byte)     v
+02D7   001A           00083         movwi   FSR0++
+02D8   3002           00084         movlw   USBH                ; bcdUSB (high byte)  >2.0<
+02D9   001A           00085         movwi   FSR0++
+02DA   3000           00086         movlw   0x00                ; bDeviceClass
+02DB   001A           00087         movwi   FSR0++
+02DC   3000           00088         movlw   0x00                ; bDeviceSubClass
+02DD   001A           00089         movwi   FSR0++
+02DE   3000           00090         movlw   0x00                ; bDeviceProtocol
+02DF   001A           00091         movwi   FSR0++
+02E0   3040           00092         movlw   MAX_PACKET_SIZE     ; bMaxPacketSize
+02E1   001A           00093         movwi   FSR0++
+02E2   30D8           00094         movlw   VIDL                ; idVendor (low byte)      v
+02E3   001A           00095         movwi   FSR0++
+02E4   3004           00096         movlw   VIDH                ; idVendor (high byte) >Microchip<
+02E5   001A           00097         movwi   FSR0++
+02E6   3077           00098         movlw   PIDL                ; idProduct (low byte),
+02E7   001A           00099         movwi   FSR0++
+02E8   30CC           00100         movlw   PIDH                ; idProduct (high byte)
+02E9   001A           00101         movwi   FSR0++
+02EA   3001           00102         movlw   REVL                ; bcdDevice (low byte)
+02EB   001A           00103         movwi   FSR0++
+02EC   3000           00104         movlw   REVH                ; bcdDevice (high byte)
+02ED   001A           00105         movwi   FSR0++
+02EE   3001           00106         movlw   0x01                ; iManufacturer
+02EF   001A           00107         movwi   FSR0++
+02F0   3002           00108         movlw   0x02                ; iProduct
+02F1   001A           00109         movwi   FSR0++
+02F2   3000           00110         movlw   0x00                ; iSerialNumber (none)
+02F3   001A           00111         movwi   FSR0++
+02F4   3001           00112         movlw   NUM_CONFIGURATIONS  ; bNumConfigurations
+02F5   001A           00113         movwi   FSR0++
+                      00114 
+02F6   3012           00115         movlw   DEVDESCBC
+02F7   00??           00116         movwf   DescriptorLength
+02F8   0008           00117         return
+                      00118 ;--------------------------------------------------------------
+02F9                  00119 ConfigurationDescriptor
+02F9   3009           00120         movlw   CONFDESCBC          ; bLength
+02FA   001A           00121         movwi   FSR0++
+02FB   3002           00122         movlw   CONFIGURATION       ; bDescriptorType
+02FC   001A           00123         movwi   FSR0++
+02FD   3029           00124         movlw   TOTALCONFDESCBC     ; wTotalLength (low byte)
+02FE   001A           00125         movwi   FSR0++
+02FF   3000           00126         movlw   0x00                ; wTotalLength (high byte) 
+0300   001A           00127         movwi   FSR0++
+0301   3001           00128         movlw   NUM_INTERFACES      ; bNumInterfaces
+0302   001A           00129         movwi   FSR0++
+0303   3001           00130         movlw   0x01                ; bConfigurationValue
+0304   001A           00131         movwi   FSR0++
+0305   3000           00132         movlw   0x00                ; iConfiguration (none)
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 25
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0306   001A           00133         movwi   FSR0++
+0307   30A0           00134         movlw   0xA0                ; bmAttributes (bus powered, remote wakeup)
+0308   001A           00135         movwi   FSR0++
+0309   3032           00136         movlw   0x32                ; bMaxPower (100 mA)
+030A   001A           00137         movwi   FSR0++
+                      00138 
+030B   2???           00139         call    InterfaceDescriptor
+030C   2???           00140         call    HIDDescriptor
+030D   2???           00141         call    Endpoint1InDescriptor
+030E   2???           00142         call    Endpoint1OutDescriptor
+030F   3029           00143         movlw   TOTALCONFDESCBC
+0310   00??           00144         movwf   DescriptorLength
+0311   0008           00145         return
+                      00146 ;--------------------------------------------------------------
+0312                  00147 InterfaceDescriptor
+0312   3009           00148         movlw   IFDESCBC             ; bLength      ** INTERFACE **
+0313   001A           00149         movwi   FSR0++
+0314   3004           00150         movlw   INTERFACE            ; bDescriptorType
+0315   001A           00151         movwi   FSR0++
+0316   3000           00152         movlw   0x00                 ; bInterfaceNumber
+0317   001A           00153         movwi   FSR0++
+0318   3000           00154         movlw   0x00                 ; bAlternateSetting
+0319   001A           00155         movwi   FSR0++
+031A   3002           00156         movlw   0x02                 ; bNumEndpoints (exc. EP0)[1_IN & 1_OUT]<<
+031B   001A           00157         movwi   FSR0++
+031C   3003           00158         movlw   USB_HID_CLASS_CODE   ; bInterfaceClass (PID)
+031D   001A           00159         movwi   FSR0++
+031E   3000           00160         movlw   NO_SUBCLASS          ; bInterfaceSubClass
+031F   001A           00161         movwi   FSR0++
+0320   3000           00162         movlw   PROTOCOL_NONE        ; bInterfaceProtocol (vendor specific protocol used)
+0321   001A           00163         movwi   FSR0++
+0322   3000           00164         movlw   0x00                 ; iInterface (none)
+0323   001A           00165         movwi   FSR0++
+                      00166 
+0324   3009           00167         movlw   IFDESCBC
+0325   00??           00168         movwf   DescriptorLength
+0326   0008           00169         return
+                      00170 ;--------------------------------------------------------------
+0327                  00171 EndpointDescriptor
+0327   08??           00172         movf    DescriptorIndex
+0328   1D03           00173         btfss   STATUS,Z
+0329   2???           00174         goto    Endpoint1OutDescriptor
+                      00175 
+032A                  00176 Endpoint1InDescriptor
+032A   3007           00177         movlw   EPDESCBC            ; bLength       ** ENDPOINT 1 IN**
+032B   001A           00178         movwi   FSR0++
+032C   3005           00179         movlw   ENDPOINT            ; bDescriptorType
+032D   001A           00180         movwi   FSR0++
+032E   3081           00181         movlw   0x81                ; bEndpointAddress
+032F   001A           00182         movwi   FSR0++
+0330   3003           00183         movlw   0x03                ; bmAttributes (Interrupt)
+0331   001A           00184         movwi   FSR0++
+0332   3004           00185         movlw   0x04                ; wMaxPacketSize (low byte)
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 26
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0333   001A           00186         movwi   FSR0++
+0334   3000           00187         movlw   0x00                ; wMaxPacketSize (high byte)
+0335   001A           00188         movwi   FSR0++
+0336   300A           00189         movlw   0x0a                ; bInterval (ms @full speed)
+0337   001A           00190         movwi   FSR0++
+                      00191 
+0338   3007           00192         movlw   EPDESCBC
+0339   00??           00193         movwf   DescriptorLength
+033A   0008           00194         return
+                      00195 ;--------------------
+033B                  00196 Endpoint1OutDescriptor
+033B   3007           00197         movlw   EPDESCBC            ; bLength       ** ENDPOINT 1 OUT**
+033C   001A           00198         movwi   FSR0++
+033D   3005           00199         movlw   ENDPOINT            ; bDescriptorType
+033E   001A           00200         movwi   FSR0++
+033F   3001           00201         movlw   0x01                ; bEndpointAddress
+0340   001A           00202         movwi   FSR0++
+0341   3003           00203         movlw   0x03                ; bmAttributes (Interrupt)
+0342   001A           00204         movwi   FSR0++
+0343   3004           00205         movlw   0x04                ; wMaxPacketSize (low byte)
+0344   001A           00206         movwi   FSR0++
+0345   3000           00207         movlw   0x00                ; wMaxPacketSize (high byte)
+0346   001A           00208         movwi   FSR0++
+0347   300A           00209         movlw   0x0a                ; bInterval (ms @full speed)
+0348   001A           00210         movwi   FSR0++
+                      00211 
+0349   3007           00212         movlw   EPDESCBC
+034A   00??           00213         movwf   DescriptorLength
+034B   0008           00214         return
+                      00215 ;--------------------------------------------------------------
+034C                  00216 StringDescriptor                ;selected by index
+034C   08??           00217         movfw   DescriptorIndex
+034D   3A00           00218         xorlw   0
+034E   1903           00219         btfsc   STATUS,Z
+034F   2???           00220         goto    String0
+0350   08??           00221         movfw   DescriptorIndex
+0351   3A01           00222         xorlw   1
+0352   1903           00223         btfsc   STATUS,Z
+0353   2???           00224         goto    String1
+0354   08??           00225         movfw   DescriptorIndex
+0355   3A02           00226         xorlw   2
+0356   1903           00227         btfsc   STATUS,Z
+0357   2???           00228         goto    String2
+0358   0008           00229         return
+                      00230 ;--------------------
+0359                  00231 String0
+0359   3004           00232         movlw   STR0DESCBC      ; bLength
+035A   001A           00233         movwi   FSR0++
+035B   3003           00234         movlw   STRING          ; bDescriptorType
+035C   001A           00235         movwi   FSR0++
+035D   3009           00236         movlw   0x09            ; wLANGID[0] (low byte)
+035E   001A           00237         movwi   FSR0++
+035F   3004           00238         movlw   0x04            ; wLANGID[0] (high byte)
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 27
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0360   001A           00239         movwi   FSR0++
+                      00240 
+0361   3004           00241         movlw   STR0DESCBC
+0362   00??           00242         movwf   DescriptorLength
+0363   0008           00243         return
+                      00244 ;--------------------
+0364                  00245 String1
+0364   3010           00246         movlw   STR1DESCBC      ; bLength
+0365   001A           00247         movwi   FSR0++
+0366   3003           00248         movlw   STRING          ; bDescriptorType
+0367   001A           00249         movwi   FSR0++
+0368   3041           00250         movlw   'A'             ;3
+0369   001A           00251         movwi   FSR0++
+036A   3000           00252         movlw   0x00            ;
+036B   001A           00253         movwi   FSR0++
+036C   3063           00254         movlw   'c'             ;5
+036D   001A           00255         movwi   FSR0++
+036E   3000           00256         movlw   0x00            ;
+036F   001A           00257         movwi   FSR0++
+0370   3065           00258         movlw   'e'             ;7
+0371   001A           00259         movwi   FSR0++
+0372   3000           00260         movlw   0x00            ;
+0373   001A           00261         movwi   FSR0++
+0374   3054           00262         movlw   'T'             ;9
+0375   001A           00263         movwi   FSR0++
+0376   3000           00264         movlw   0x00            ;
+0377   001A           00265         movwi   FSR0++
+0378   3065           00266         movlw   'e'             ;b
+0379   001A           00267         movwi   FSR0++
+037A   3000           00268         movlw   0x00            ;
+037B   001A           00269         movwi   FSR0++
+037C   3063           00270         movlw   'c'             ;d
+037D   001A           00271         movwi   FSR0++
+037E   3000           00272         movlw   0x00            ;
+037F   001A           00273         movwi   FSR0++
+0380   3068           00274         movlw   'h'             ;f
+0381   001A           00275         movwi   FSR0++
+0382   3000           00276         movlw   0x00            ;10
+0383   001A           00277         movwi   FSR0++
+                      00278 
+0384   3010           00279         movlw   STR1DESCBC
+0385   00??           00280         movwf   DescriptorLength
+0386   0008           00281         return
+                      00282 ;--------------------
+0387                  00283 String2
+0387   3012           00284         movlw   STR2DESCBC      ; bLength
+0388   001A           00285         movwi   FSR0++
+0389   3003           00286         movlw   STRING          ; bDescriptorType
+038A   001A           00287         movwi   FSR0++
+038B   3044           00288         movlw   'D'
+038C   001A           00289         movwi   FSR0++
+038D   3000           00290         movlw   0x00            ;4
+038E   001A           00291         movwi   FSR0++
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 28
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+038F   306F           00292         movlw   'o'
+0390   001A           00293         movwi   FSR0++
+0391   3000           00294         movlw   0x00            ;6
+0392   001A           00295         movwi   FSR0++
+0393   306F           00296         movlw   'o'
+0394   001A           00297         movwi   FSR0++
+0395   3000           00298         movlw   0x00            ;8
+0396   001A           00299         movwi   FSR0++
+0397   3072           00300         movlw   'r'
+0398   001A           00301         movwi   FSR0++
+0399   3000           00302         movlw   0x00            ;a
+039A   001A           00303         movwi   FSR0++
+039B   3062           00304         movlw   'b'
+039C   001A           00305         movwi   FSR0++
+039D   3000           00306         movlw   0x00            ;c
+039E   001A           00307         movwi   FSR0++
+039F   3065           00308         movlw   'e'
+03A0   001A           00309         movwi   FSR0++
+03A1   3000           00310         movlw   0x00            ;e
+03A2   001A           00311         movwi   FSR0++
+03A3   306C           00312         movlw   'l'
+03A4   001A           00313         movwi   FSR0++
+03A5   3000           00314         movlw   0x00            ;10
+03A6   001A           00315         movwi   FSR0++
+03A7   306C           00316         movlw   'l'
+03A8   001A           00317         movwi   FSR0++
+03A9   3000           00318         movlw   0x00            ;12
+03AA   001A           00319         movwi   FSR0++
+                      00320 
+03AB   3012           00321         movlw   STR2DESCBC
+03AC   00??           00322         movwf   DescriptorLength
+03AD   0008           00323         return
+                      00324 ;===========================================================================
+                      00325 ;                       HID Descriptors
+                      00326 ;===========================================================================
+03AE                  00327 HIDDescriptor
+03AE   3009           00328         movlw   HIDDESCBC       ; bLength
+03AF   001A           00329         movwi   FSR0++
+03B0   3021           00330         movlw   HID             ; bDescriptorType
+03B1   001A           00331         movwi   FSR0++
+03B2   3011           00332         movlw   0x11            ; bcdHID (low byte)
+03B3   001A           00333         movwi   FSR0++
+03B4   3001           00334         movlw   0x01            ; bcdHID (high byte)
+03B5   001A           00335         movwi   FSR0++
+03B6   3000           00336         movlw   0x00            ; bCountryCode
+03B7   001A           00337         movwi   FSR0++
+03B8   3001           00338         movlw   0x01            ; bNumDescriptors
+03B9   001A           00339         movwi   FSR0++
+03BA   3022           00340         movlw   REPORT          ; bDescriptorType
+03BB   001A           00341         movwi   FSR0++
+03BC   3022           00342         movlw   REPORTDESCBC    ; wItemLengthL(byte count of report descriptor) 
+03BD   001A           00343         movwi   FSR0++
+03BE   3000           00344         movlw   0x00            ; wItemLengthH
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 29
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+03BF   001A           00345         movwi   FSR0++
+                      00346 
+03C0   3009           00347         movlw   HIDDESCBC
+03C1   00??           00348         movwf   DescriptorLength
+03C2   0008           00349         return
+                      00350 ;--------------------------------------------------------------
+03C3                  00351 ReportDescriptor
+03C3   3006           00352         movlw   0x06            ; USAGE PAGE
+03C4   001A           00353         movwi   FSR0++
+03C5   30A0           00354         movlw   0xa0            ; Usage Page (low byte)
+03C6   001A           00355         movwi   FSR0++
+03C7   30FF           00356         movlw   0xff            ; Usage Page (high byte) (vendor defined)
+03C8   001A           00357         movwi   FSR0++
+03C9   3009           00358         movlw   0x09            ; USAGE
+03CA   001A           00359         movwi   FSR0++
+03CB   3002           00360         movlw   0x02            ; Usage (vendor defined)
+03CC   001A           00361         movwi   FSR0++
+                      00362 
+03CD   30A1           00363         movlw   0xa1            ; COLLECTION
+03CE   001A           00364         movwi   FSR0++
+03CF   3001           00365         movlw   0x01            ; Collection    (application)
+03D0   001A           00366         movwi   FSR0++
+                      00367 
+03D1   3009           00368         movlw   0x09            ; USAGE
+03D2   001A           00369         movwi   FSR0++
+03D3   3003           00370         movlw   0x03            ; Usage
+03D4   001A           00371         movwi   FSR0++
+03D5   3015           00372         movlw   0x15            ; LOGICAL MINIMUM
+03D6   001A           00373         movwi   FSR0++
+03D7   3000           00374         movlw   0x00            ; Logical Minimum
+03D8   001A           00375         movwi   FSR0++
+03D9   3026           00376         movlw   0x26            ; LOGICAL MAXIMUM
+03DA   001A           00377         movwi   FSR0++
+03DB   30FF           00378         movlw   0xff            ; Logical Maximum (low byte)
+03DC   001A           00379         movwi   FSR0++
+03DD   3000           00380         movlw   0x00            ; Logical Maximum (high byte)
+03DE   001A           00381         movwi   FSR0++
+03DF   3075           00382         movlw   0x75            ; REPORT SIZE
+03E0   001A           00383         movwi   FSR0++
+03E1   3008           00384         movlw   0x08            ; Report Size
+03E2   001A           00385         movwi   FSR0++
+03E3   3095           00386         movlw   0x95            ; REPORT COUNT
+03E4   001A           00387         movwi   FSR0++
+03E5   3001           00388         movlw   0x01            ; Report Count
+03E6   001A           00389         movwi   FSR0++
+03E7   3081           00390         movlw   0x81            ; INPUT
+03E8   001A           00391         movwi   FSR0++
+03E9   3002           00392         movlw   0x02            ; (Data, Variable, Absolute)
+03EA   001A           00393         movwi   FSR0++
+                      00394 
+03EB   3009           00395         movlw   0x09            ; USAGE
+03EC   001A           00396         movwi   FSR0++
+03ED   3004           00397         movlw   0x04            ; Usage
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 30
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+03EE   001A           00398         movwi   FSR0++
+03EF   3015           00399         movlw   0x15            ; LOGICAL MINIMUM
+03F0   001A           00400         movwi   FSR0++
+03F1   3000           00401         movlw   0x00            ; Logical Minimum
+03F2   001A           00402         movwi   FSR0++
+03F3   3026           00403         movlw   0x26            ; LOGICAL MAXIMUM
+03F4   001A           00404         movwi   FSR0++
+03F5   30FF           00405         movlw   0xff            ; Logical Maximum (low byte)
+03F6   001A           00406         movwi   FSR0++
+03F7   3000           00407         movlw   0x00            ; Logical Maximum (high byte)
+03F8   001A           00408         movwi   FSR0++
+03F9   3075           00409         movlw   0x75            ; REPORT SIZE
+03FA   001A           00410         movwi   FSR0++
+03FB   3008           00411         movlw   0x08            ; Report Size
+03FC   001A           00412         movwi   FSR0++
+03FD   3095           00413         movlw   0x95            ; REPORT COUNT
+03FE   001A           00414         movwi   FSR0++
+03FF   3001           00415         movlw   0x01            ; Report Count
+0400   001A           00416         movwi   FSR0++
+0401   3091           00417         movlw   0x91            ; OUTPUT
+0402   001A           00418         movwi   FSR0++
+0403   3002           00419         movlw   0x02            ; (Data, Variable, Absolute)
+0404   001A           00420         movwi   FSR0++
+                      00421 
+0405   30C0           00422         movlw   0xc0            ; END COLLECTION
+0406   001A           00423         movwi   FSR0++
+                      00424 
+0407   3022           00425         movlw   REPORTDESCBC
+0408   00??           00426         movwf   DescriptorLength
+0409   0008           00427         return
+                      00428 
+                      00429 ;--------------------
+                      00430 
+                      00925     #include "Test.inc"
+040A                  00001 Pause   ;x 10ms in W
+040A   00??           00002         movwf   COUNT0
+040B   0021           00003         banksel OPTION_REG
+040C   1295           00004         bcf     OPTION_REG, TMR0CS  ;internal clock
+040D   1195           00005         bcf     OPTION_REG, PSA     ;
+040E   1015           00006         bcf     OPTION_REG, PS0
+040F   1495           00007         bsf     OPTION_REG, PS1
+0410   1115           00008         bcf     OPTION_REG, PS2
+0411   0020           00009         banksel TMR0
+                      00010 
+0412                  00011 psC0_bk
+0412   300A           00012         movlw   0x0a
+0413   00??           00013         movwf   COUNT1
+0414                  00014 psC1_bk
+0414   0195           00015         clrf    TMR0
+0415   110B           00016         bcf     INTCON, TMR0IF  ; clear interrupt
+0416                  00017 psT_bk
+0416   1D0B           00018         btfss   INTCON, TMR0IF
+0417   2???           00019         goto    psT_bk
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 31
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0418   0B??           00020         decfsz  COUNT1
+0419   2???           00021         goto    psC1_bk
+041A   0B??           00022         decfsz  COUNT0
+041B   2???           00023         goto    psC0_bk
+                      00024 
+041C   0008           00025         return
+                      00026 ;---------------------------------------------------
+041D                  00027 Flash                               ;flashes LED no. of times controlled by W
+041D   00??           00028         movwf   COUNT0              ;store no. of flashes
+041E   08??           00029         movf    COUNT0              ;test count
+041F   1903           00030         btfsc   STATUS, Z           ;return
+0420   0008           00031         return                      ;if zero
+                      00032 
+0421   0021           00033         banksel OPTION_REG
+0422   1295           00034         bcf     OPTION_REG, TMR0CS  ;internal clock
+0423   1195           00035         bcf     OPTION_REG, PSA     ;
+0424   1415           00036         bsf     OPTION_REG, PS0
+0425   1495           00037         bsf     OPTION_REG, PS1
+0426   1515           00038         bsf     OPTION_REG, PS2
+0427   3008           00039         movlw   0x08                ;time adjust
+                      00040 
+0428                  00041 flon
+0428   0020           00042         banksel PORTC           ;PORTC & TMR0
+0429   158E           00043         bsf     ORANGE          ; LED on
+042A   00??           00044         movwf   COUNT1
+042B                  00045 flonC_bk
+042B   0195           00046         clrf    TMR0
+042C   110B           00047         bcf     INTCON, TMR0IF  ; clear interrupt
+042D                  00048 flon_bk
+042D   1D0B           00049         btfss   INTCON, TMR0IF
+042E   2???           00050         goto    flon_bk
+042F   0B??           00051         decfsz  COUNT1
+0430   2???           00052         goto    flonC_bk
+                      00053 
+0431                  00054 floff
+0431   118E           00055         bcf     ORANGE          ; LED off
+0432   00??           00056         movwf   COUNT1
+0433                  00057 floffC_bk
+0433   0195           00058         clrf    TMR0
+0434   110B           00059         bcf     INTCON, TMR0IF  ; clear interrupt
+0435                  00060 floff_bk
+0435   1D0B           00061         btfss   INTCON, TMR0IF
+0436   2???           00062         goto    floff_bk
+0437   0B??           00063         decfsz  COUNT1
+0438   2???           00064         goto    floffC_bk
+                      00065 
+0439   0B??           00066         decfsz  COUNT0
+043A   2???           00067         goto    flon
+                      00068 
+043B   0008           00069         return
+                      00070 ;---------------------------------------------------
+043C                  00071 Red
+043C   0020           00072         banksel PORTC   ;
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 32
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+043D   150E           00073         bsf     RED     ;
+043E   0008           00074         return
+                      00075 ;---------------------------------------------------
+043F                  00076 Orng
+043F   0020           00077         banksel PORTC   ;
+0440   158E           00078         bsf     ORANGE  ;
+0441   0008           00079         return
+                      00080 ;---------------------------------------------------
+0442                  00081 Grn
+0442   0020           00082         banksel PORTC   ;
+0443   160E           00083         bsf     GREEN   ;
+0444   0008           00084         return
+                      00085 ;---------------------------------------------------
+0445                  00086 _Grn
+0445   0020           00087         banksel PORTC   ;
+0446   120E           00088         bcf     GREEN   ;
+0447   0008           00089         return
+                      00090 ;---------------------------------------------------
+0448                  00091 Clr
+0448   0020           00092         banksel PORTC   ;
+0449   018E           00093         clrf    PORTC   ;
+044A   0008           00094         return
+                      00095 ;---------------------------------------------------
+044B   0808           00096 tRst    movfw   BSR
+044C   002?           00097         banksel test
+044D   01??           00098         clrf    bConfig
+044E   0A??           00099         incf    num_rst
+044F   0088           00100         movwf   BSR
+0450   0008           00101         return
+                      00102 ;---------------------------------------------------
+0451                  00103 setConf
+0451   0808           00104         movfw   BSR
+0452   002?           00105         banksel test
+0453   0A??           00106         incf    bConfig
+0454   0088           00107         movwf   BSR
+0455   0008           00108         return
+                      00109 ;---------------------------------------------------
+0456   0808           00110 incGD   movfw   BSR
+0457   002?           00111         banksel test
+0458   0A??           00112         incf    num_gd
+0459   0088           00113         movwf   BSR
+045A   0008           00114         return
+                      00115 ;---------------------------------------------------
+045B   0808           00116 incSA   movfw   BSR
+045C   002?           00117         banksel test
+045D   0A??           00118         incf    num_sa
+045E   0088           00119         movwf   BSR
+045F   0008           00120         return
+                      00121 ;---------------------------------------------------
+0460                  00122 ShowByte
+0460   002?           00123         banksel test
+0461   00??           00124         movwf   TEMP0
+0462   00??           00125         movwf   TEMP1
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 33
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0463   0020           00126         banksel PORTC
+0464   018E           00127         clrf    PORTC       ;clear LEDs
+                      00128 
+0465   150E           00129 hi:     bsf     RED       ; hi nybble
+                      00130 
+0466   002?           00131         banksel test
+0467   36??           00132         lsrf    TEMP0
+0468   36??           00133         lsrf    TEMP0
+0469   36??           00134         lsrf    TEMP0
+046A   36??           00135         lsrf    TEMP0
+046B   08??           00136         movfw   TEMP0
+046C   2???           00137         call    Flash
+                      00138 
+046D   3025           00139         movlw   25          ;0.25s
+046E   2???           00140         call    Pause
+046F   0020           00141         banksel PORTC
+0470   018E           00142         clrf    PORTC       ;clear LEDs
+                      00143 
+0471   0020           00144         banksel PORTC
+0472   160E           00145         bsf     GREEN
+                      00146 
+0473   300F           00147 lo:     movlw   0x0f        ; lo nybble
+0474   002?           00148         banksel TEMP0
+0475   05??           00149         andwf   TEMP1,0
+0476   2???           00150         call    Flash
+                      00151 
+0477   3025           00152         movlw   25          ;0.25s
+0478   2???           00153         call    Pause
+                      00154 
+0479   0020           00155         banksel PORTC
+047A   018E           00156         clrf    PORTC       ;clear LEDs
+                      00157 
+047B   3050           00158         movlw   50          ;0.5s
+047C   2???           00159         call    Pause
+                      00160 
+047D   0008           00161         return
+                      00162 ;---------------------------------------------------
+047E                  00163 InitTest
+047E   3004           00164         movlw   0x04        ;bank 8
+047F   0087           00165         movwf   FSR1H
+0480   30??           00166         movlw   SC          ;
+0481   0086           00167         movwf   FSR1L
+0482   002?           00168         banksel test
+0483   01??           00169         clrf    bConfig
+0484   01??           00170         clrf    num_rst
+0485   01??           00171         clrf    num_gd
+0486   01??           00172         clrf    num_sa
+0487   01??           00173         clrf    tc
+0488   3050           00174         movlw   0x50
+0489   00??           00175         movwf   COUNT0
+048A   0103           00176         clrw
+048B   001E           00177 it_clr  movwi   FSR1++
+048C   0B??           00178         decfsz  COUNT0
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 34
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+048D   2???           00179         goto    it_clr
+                      00180 
+048E   0008           00181         return
+                      00182 ;---------------------------------------------------
+048F                  00183 Sh_xy
+048F   002?           00184         banksel test
+0490   3002           00185         movlw   0x02        ;resets
+0491   06??           00186         xorwf   num_rst,0
+0492   1D03           00187         btfss   STATUS,Z
+0493   0008           00188         return
+0494   3001           00189         movlw   0x01        ;GetDescriptors
+0495   06??           00190         xorwf   num_gd,0
+0496   1D03           00191         btfss   STATUS,Z
+0497   0008           00192         return
+0498   3001           00193 nSA     movlw   0x01        ;SetAddress
+0499   06??           00194         xorwf   num_sa,0
+049A   1D03           00195         btfss   STATUS,Z
+049B   0008           00196         return
+049C   2???           00197         call    ShowBytes
+049D   0008           00198         return
+                      00199 ;---------------------------------------------------
+049E                  00200 ShowBytes
+049E   2???           00201         call Clr
+049F   3032           00202         movlw   0x32
+04A0   2???           00203         call    Pause
+04A1   003D           00204         banksel UCON
+04A2   080F           00205         movfw   USTAT
+04A3   2???           00206         call    ShowByte            ;USTAT
+04A4   3004           00207         movlw   0x04        ;DIR mask
+04A5   003D           00208         banksel UCON
+04A6   050F           00209         andwf   USTAT,0
+04A7   1D03           00210         btfss   STATUS,Z    ;check Direction
+04A8   2???           00211         goto    t_In
+04A9   3000           00212 t_out   movlw   BD0STATL
+04AA   0084           00213         movwf   FSR0L
+04AB   0800           00214         movfw   INDF0
+04AC   2???           00215         call    ShowByte            ;BD0STAT
+04AD   3040           00216         movlw   BD0DATAL + bmRequestType
+04AE   0084           00217         movwf   FSR0L
+04AF   0012           00218         moviw   FSR0++
+04B0   2???           00219         call    ShowByte            ;bmRequestType
+04B1   0012           00220         moviw   FSR0++
+04B2   2???           00221         call    ShowByte            ;bRequest
+04B3   0012           00222         moviw   FSR0++
+04B4   2???           00223         call    ShowByte            ;wValueL
+04B5   0012           00224         moviw   FSR0++
+04B6   2???           00225         call    ShowByte            ;wValueH
+04B7   0012           00226         moviw   FSR0++
+                      00227 ;        call    ShowByte            ;wIndexL
+04B8   0012           00228         moviw   FSR0++
+                      00229 ;        call    ShowByte            ;wIndexH
+04B9   0012           00230         moviw   FSR0++
+04BA   2???           00231         call    ShowByte            ;wLengthL
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 35
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+04BB   0012           00232         moviw   FSR0++
+                      00233 ;        call    ShowByte            ;wLengthH
+04BC   2???           00234         goto    ds_ex
+04BD                  00235 t_In
+04BD   3004           00236         movlw   BD1STATL
+04BE   0084           00237         movwf   FSR0L
+04BF   0800           00238         movfw   INDF0
+04C0   2???           00239         call    ShowByte            ;BD1STAT
+04C1                  00240 ds_ex
+04C1   2???           00241         goto    $;***;***
+04C2   0008           00242         return
+                      00243 ;---------------------------------------------------
+                      00244         #define TCOUNT  0x01
+04C3                  00245 TLog
+04C3   0A??           00246         incf    IN;<<<<<<<<<<<<<<
+04C4   0008           00247         return;<<<<<<<<<<<<<<
+                      00248 
+04C5   002?           00249         banksel test
+04C6   08??           00250         movf    bConfig     ;check configured
+04C7   1903           00251         btfsc   STATUS,Z
+04C8   0008           00252         return
+                      00253 
+04C9   0A??           00254         incf    tc          ;increment count
+04CA   3001           00255         movlw   TCOUNT
+04CB   06??           00256         xorwf   tc,0
+04CC   1D03           00257         btfss   STATUS,Z
+04CD   0008           00258         return
+                      00259 
+04CE   2???           00260         call    ShowBytes
+                      00261 
+                      00262 ;---------------------------------------------------
+                      00926 ;*****************************************************
+0FC2 39FF             00927                 end
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 36
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+ABDEN                             00000000
+ABDOVF                            00000007
+ACKDT                             00000005
+ACKEN                             00000004
+ACKSTAT                           00000006
+ACKTIM                            00000007
+ACTCON                            0000039B
+ACTEN                             00000007
+ACTIE                             00000001
+ACTIF                             00000001
+ACTLOCK                           00000003
+ACTORS                            00000001
+ACTSRC                            00000004
+ACTUD                             00000006
+ACTVIE                            00000002
+ACTVIF                            00000002
+ADDEN                             00000003
+ADDR                              00000072
+ADDR0                             00000000
+ADDR1                             00000001
+ADDR2                             00000002
+ADDR3                             00000003
+ADDR4                             00000004
+ADDR5                             00000005
+ADDR6                             00000006
+ADDRESSH                          0x03
+ADDRESSL                          0x02
+ADDRESS_STATE                     0x02
+AHEN                              00000001
+ANSA4                             00000005
+ANSC0                             00000000
+ANSC1                             00000001
+ANSC2                             00000002
+ANSC3                             00000003
+ANSELA                            0000018C
+ANSELC                            0000018E
+APFCON                            0000011D
+BAUDCON                           0000019F
+BCL1IE                            00000003
+BCL1IF                            00000003
+BD0ADRHH                          0x20
+BD0ADRHL                          0x03
+BD0ADRLH                          0x20
+BD0ADRLL                          0x02
+BD0CNTH                           0x20
+BD0CNTL                           0x01
+BD0DATAH                          0x20
+BD0DATAL                          0x40
+BD0STATH                          0x20
+BD0STATL                          0x00
+BD1ADRHH                          0x20
+BD1ADRHL                          0x07
+BD1ADRLH                          0x20
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 37
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+BD1ADRLL                          0x06
+BD1CNTH                           0x20
+BD1CNTL                           0x05
+BD1DATAH                          0x20
+BD1DATAL                          0x80
+BD1STATH                          0x20
+BD1STATL                          0x04
+BD2ADRHH                          0x20
+BD2ADRHL                          0x0b
+BD2ADRLH                          0x20
+BD2ADRLL                          0x0a
+BD2CNTH                           0x20
+BD2CNTL                           0x09
+BD2DATAH                          0x20
+BD2DATAL                          0xc0
+BD2STATH                          0x20
+BD2STATL                          0x08
+BD3ADRHH                          0x20
+BD3ADRHL                          0x0f
+BD3ADRLH                          0x20
+BD3ADRLL                          0x0e
+BD3CNTH                           0x20
+BD3CNTL                           0x0d
+BD3DATAH                          0x20
+BD3DATAL                          0xe0
+BD3STATH                          0x20
+BD3STATL                          0x0c
+BF                                00000000
+BOEN                              00000004
+BOOT_INTERFACE_SUBCLASS           0x01
+BORCON                            00000116
+BORFS                             00000006
+BORRDY                            00000000
+BRG16                             00000003
+BRGH                              00000002
+BSR                               00000008
+BSR0                              00000000
+BSR1                              00000001
+BSR2                              00000002
+BSR3                              00000003
+BSR4                              00000004
+BSR_SHAD                          00000FE6
+BSTALL                            0x02
+BTOEE                             00000004
+BTOEF                             00000004
+BTSEE                             00000007
+BTSEF                             00000007
+BYTECOUNT                         0x01
+C                                 00000000
+CFGS                              00000006
+CKE                               00000006
+CKP                               00000004
+CLASS                             0x01 << 5
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 38
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+CLEAR_FEATURE                     0x01
+CLKRCD0                           00000003
+CLKRCD1                           00000004
+CLKRCON                           0000039A
+CLKRDIV0                          00000000
+CLKRDIV1                          00000001
+CLKRDIV2                          00000002
+CLKREN                            00000007
+CLKROE                            00000006
+CLKRSEL                           00000007
+CLKRSLR                           00000005
+CONFDESCBC                        0x09
+CONFIGURATION                     2
+CONFIG_STATE                      0x03
+COUNT0                            0000007C
+COUNT1                            0000007D
+CRC16EE                           00000002
+CRC16EF                           00000002
+CRC5EE                            00000001
+CRC5EF                            00000001
+CREN                              00000004
+CSRC                              00000007
+ClassSpecificRequest              0000021D
+ClearEndpointFeature              00000217
+ClearFeature                      000001AE
+ClearInterfaceFeature             000001F2
+Clr                               00000448
+ConfigurationDescriptor           000002F9
+DC                                00000001
+DEFAULT_STATE                     0x01
+DEVDESCBC                         0x12
+DEVICE                            1
+DEVICETOHOST                      0x80
+DEVICE_REMOTE_WAKEUP              0x01
+DFN8EE                            00000003
+DFN8EF                            00000003
+DHEN                              00000000
+DIR                               00000002
+DTS                               0x06
+DTSEN                             0x03
+DVD_SUBCLASS                      0x02
+D_NOT_A                           00000005
+Data_wLength                      00000075
+DescriptorIndex                   00000077
+DescriptorLength                  00000078
+DescriptorType                    00000076
+DeviceDescriptor                  000002D2
+DeviceToHost                      0000014C
+Device_State                      00000070
+ENDP0                             00000003
+ENDP1                             00000004
+ENDP2                             00000005
+ENDP3                             00000006
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 39
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+ENDPOINT                          5
+ENDPOINTTOHOST                    0x82
+ENDPOINT_HALT                     0x00
+ENDPT_CONTROL                     0x16
+ENDPT_DISABLED                    0x00
+ENDPT_IN_ONLY                     0x12
+ENDPT_NON_CONTROL                 0x1E
+ENDPT_OUT_ONLY                    0x14
+EP0                               0x00 << 3
+EP0_In                            0000010B
+EP0_Out                           000000FD
+EP1                               0x01 << 3
+EP1_In                            00000285
+EP1_Out                           00000289
+EP1_dev_req                       0000007B
+EP2                               0x02 << 3
+EPCONDIS                          00000003
+EPDESCBC                          0x07
+EPHSHK                            00000004
+EPINEN                            00000001
+EPOUTEN                           00000002
+EPSTALL                           00000000
+EP_0                              000000F9
+EP_1                              00000280
+EP_DISABLED_STATE                 0xff
+EP_IDLE_STATE                     0x00
+EP_SETUP_STATE                    0x01
+Endpoint1InDescriptor             0000032A
+Endpoint1OutDescriptor            0000033B
+EndpointDescriptor                00000327
+EndpointToHost                    00000184
+EpSynchFrame                      0000021B
+F                                 00000001
+FDD_SUBCLASS                      0x05
+FERR                              00000002
+FREE                              00000004
+FRM0                              00000000
+FRM1                              00000001
+FRM10                             00000002
+FRM2                              00000002
+FRM3                              00000003
+FRM4                              00000004
+FRM5                              00000005
+FRM6                              00000006
+FRM7                              00000007
+FRM8                              00000000
+FRM9                              00000001
+FSEN                              00000002
+FSR0                              00000004
+FSR0H                             00000005
+FSR0H_SHAD                        00000FE9
+FSR0L                             00000004
+FSR0L_SHAD                        00000FE8
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 40
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+FSR1                              00000006
+FSR1H                             00000007
+FSR1H_SHAD                        00000FEB
+FSR1L                             00000006
+FSR1L_SHAD                        00000FEA
+FVRCON                            00000117
+FVREN                             00000007
+FVRRDY                            00000006
+Flash                             0000041D
+GCEN                              00000007
+GET_CONFIGURATION                 0x08
+GET_DESCRIPTOR                    0x06
+GET_IDLE                          0x02
+GET_INTERFACE                     0x0A
+GET_PROTOCOL                      0x03
+GET_REPORT                        0x01
+GET_STATUS                        0x00
+GET_STRING_DESCRIPTOR             0x66
+GIE                               00000007
+GREEN                             PORTC, RC4
+GetConfiguration                  000001C6
+GetDescriptor                     0000028E
+GetEndpointStatus                 0000020B
+GetIdle                           00000259
+GetInterface                      000001F8
+GetInterfaceStatus                000001E6
+GetProtocol                       0000025B
+GetReport                         00000238
+GetStatus                         000001A2
+Grn                               00000442
+HFIOFR                            00000004
+HFIOFS                            00000000
+HID                               0x21
+HIDDESCBC                         0x09
+HIDDescriptor                     000003AE
+HID_SET_REPORT                    0x21
+HOSTTODEVICE                      0x00
+HOSTTOENDPOINT                    0x02
+HOSTTOINTERFACE                   0x01
+HostToDevice                      00000135
+HostToEndpoint                    00000179
+HostToInterface                   0000015B
+IDLEIE                            00000004
+IDLEIF                            00000004
+IFDESCBC                          0x09
+IN                                00000079
+INDF0                             00000000
+INDF1                             00000001
+INTCON                            0000000B
+INTE                              00000004
+INTEDG                            00000006
+INTERFACE                         4
+INTERFACETOHOST                   0x81
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 41
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+INTF                              00000001
+INTINDESCBC                       0x07
+INT_IN                            0xfb
+INT_OUT                           0xfc
+INT_STAT_MASK_ERROR               0x02
+INT_STAT_MASK_RESET               0x01
+INT_STAT_MASK_SLEEP               0x08
+INT_STAT_MASK_STALL               0x10
+INT_STAT_MASK_TOKEN_DONE          0x04
+IN_REPORT_SIZE                    0x02
+IOCAF                             00000393
+IOCAF0                            00000000
+IOCAF1                            00000001
+IOCAF3                            00000003
+IOCAF4                            00000004
+IOCAF5                            00000005
+IOCAN                             00000392
+IOCAN0                            00000000
+IOCAN1                            00000001
+IOCAN3                            00000003
+IOCAN4                            00000004
+IOCAN5                            00000005
+IOCAP                             00000391
+IOCAP0                            00000000
+IOCAP1                            00000001
+IOCAP3                            00000003
+IOCAP4                            00000004
+IOCAP5                            00000005
+IOCIE                             00000003
+IOCIF                             00000000
+IRCF0                             00000002
+IRCF1                             00000003
+IRCF2                             00000004
+IRCF3                             00000005
+Idle                              00000076
+In                                00000194
+InitTest                          0000047E
+InitUSB                           00000025
+Init_TMR2                         000000CE
+InterfaceDescriptor               00000312
+InterfaceToHost                   0000016A
+JSREPORTDESCBC                    0x2b
+LATA                              0000010C
+LATA4                             00000004
+LATA5                             00000005
+LATC                              0000010E
+LATC0                             00000000
+LATC1                             00000001
+LATC2                             00000002
+LATC3                             00000003
+LATC4                             00000004
+LATC5                             00000005
+LEDS                              000003A7
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 42
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+LFIOFR                            00000001
+LWLO                              00000005
+MAX_PACKET_SIZE                   0x40
+Main                              000000D6
+MaskedInts                        00000071
+NOT_BOR                           00000000
+NOT_PD                            00000003
+NOT_POR                           00000001
+NOT_RI                            00000002
+NOT_RMCLR                         00000003
+NOT_RWDT                          00000004
+NOT_T1SYNC                        00000002
+NOT_TO                            00000004
+NOT_WPUEN                         00000007
+NO_REQUEST                        0xFF
+NO_SUBCLASS                       0x00
+NUM_CONFIGURATIONS                1
+NUM_INTERFACES                    1
+NUM_STRINGS                       2
+OERR                              00000001
+OPTION_REG                        00000095
+ORANGE                            PORTC, RC3
+OSCCON                            00000099
+OSCSTAT                           0000009A
+OSCTUNE                           00000098
+OSFIE                             00000007
+OSFIF                             00000007
+OSTS                              00000005
+OUT                               0000007A
+OUT_REPORT_SIZE                   0x02
+Orng                              0000043F
+Out                               0000019A
+P                                 00000004
+PCIE                              00000006
+PCL                               00000002
+PCLATH                            0000000A
+PCLATH_SHAD                       00000FE7
+PCON                              00000096
+PEIE                              00000006
+PEN                               00000002
+PHYSICAL                          0x23
+PID                               00000074
+PIDEE                             00000000
+PIDEF                             00000000
+PIDH                              0xcc
+PIDL                              0x77
+PIE1                              00000091
+PIE2                              00000092
+PIR1                              00000011
+PIR2                              00000012
+PKTDIS                            00000004
+PLLRDY                            00000006
+PMADR                             00000191
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 43
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+PMADRH                            00000192
+PMADRL                            00000191
+PMCON1                            00000195
+PMCON2                            00000196
+PMDAT                             00000193
+PMDATH                            00000194
+PMDATL                            00000193
+PORTA                             0000000C
+PORTC                             0000000E
+POWERED_STATE                     0x00
+PPB0                              00000000
+PPB1                              00000001
+PPBI                              00000001
+PPBRST                            00000006
+PR2                               0000001B
+PROTOCOL_KEYBOARD                 0x01
+PROTOCOL_MOUSE                    0x02
+PROTOCOL_NONE                     0x00
+PS0                               00000000
+PS1                               00000001
+PS2                               00000002
+PSA                               00000003
+PWM1CON                           00000613
+PWM1CON0                          00000613
+PWM1DCH                           00000612
+PWM1DCH0                          00000000
+PWM1DCH1                          00000001
+PWM1DCH2                          00000002
+PWM1DCH3                          00000003
+PWM1DCH4                          00000004
+PWM1DCH5                          00000005
+PWM1DCH6                          00000006
+PWM1DCH7                          00000007
+PWM1DCL                           00000611
+PWM1DCL0                          00000006
+PWM1DCL1                          00000007
+PWM1EN                            00000007
+PWM1OE                            00000006
+PWM1OUT                           00000005
+PWM1POL                           00000004
+PWM2CON                           00000616
+PWM2CON0                          00000616
+PWM2DCH                           00000615
+PWM2DCH0                          00000000
+PWM2DCH1                          00000001
+PWM2DCH2                          00000002
+PWM2DCH3                          00000003
+PWM2DCH4                          00000004
+PWM2DCH5                          00000005
+PWM2DCH6                          00000006
+PWM2DCH7                          00000007
+PWM2DCL                           00000614
+PWM2DCL0                          00000006
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 44
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+PWM2DCL1                          00000007
+PWM2EN                            00000007
+PWM2OE                            00000006
+PWM2OUT                           00000005
+PWM2POL                           00000004
+Pause                             0000040A
+RA0                               00000000
+RA1                               00000001
+RA3                               00000003
+RA4                               00000004
+RA5                               00000005
+RBC_SUBCLASS                      0x01
+RC0                               00000000
+RC1                               00000001
+RC2                               00000002
+RC3                               00000003
+RC4                               00000004
+RC5                               00000005
+RCEN                              00000003
+RCIDL                             00000006
+RCIE                              00000005
+RCIF                              00000005
+RCREG                             00000199
+RCSTA                             0000019D
+RD                                00000000
+RECIPIENT_DEVICE                  0x00
+RECIPIENT_ENDPOINT                0x02
+RECIPIENT_INTERFACE               0x01
+RED                               PORTC, RC2
+REPORT                            0x22
+REPORTDESCBC                      0x22
+REPORT_TYPE_FEATURE               0x03
+REPORT_TYPE_INPUT                 0x01
+RESUME                            00000002
+REVH                              0x00
+REVL                              0x01
+RSEN                              00000001
+RX9                               00000006
+RX9D                              00000000
+R_NOT_W                           00000002
+Red                               0000043C
+ReportDescriptor                  000003C3
+Reset_EP0_InBuffer                00000093
+Reset_EP0_OutBuffer               0000008C
+Reset_EP1_InBuffer                000000A1
+Reset_EP1_OutBuffer               0000009A
+S                                 00000003
+S0                                00000421
+SBCDE                             00000002
+SBOREN                            00000007
+SC                                00000420
+SCIE                              00000005
+SCKP                              00000004
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 45
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+SCS0                              00000000
+SCS1                              00000001
+SCSI_SUBCLASS                     0x06
+SDAHT                             00000003
+SE0                               00000005
+SEN                               00000000
+SENDB                             00000003
+SET_ADDRESS                       0x05
+SET_CONFIGURATION                 0x09
+SET_DESCRIPTOR                    0x07
+SET_FEATURE                       0x03
+SET_IDLE                          0x0A
+SET_INTERFACE                     0x0B
+SET_PROTOCOL                      0x0B
+SET_REPORT                        0x09
+SMP                               00000007
+SOFIE                             00000006
+SOFIF                             00000006
+SOSCR                             00000007
+SPBRG                             0000019B
+SPBRGH                            0000019C
+SPBRGL                            0000019B
+SPEN                              00000007
+SPLLEN                            00000007
+SPLLMULT                          00000006
+SREN                              00000005
+SSP1ADD                           00000212
+SSP1BUF                           00000211
+SSP1CON1                          00000215
+SSP1CON2                          00000216
+SSP1CON3                          00000217
+SSP1EN                            00000005
+SSP1IE                            00000003
+SSP1IF                            00000003
+SSP1M0                            00000000
+SSP1M1                            00000001
+SSP1M2                            00000002
+SSP1M3                            00000003
+SSP1MSK                           00000213
+SSP1OV                            00000006
+SSP1STAT                          00000214
+SSPADD                            00000212
+SSPBUF                            00000211
+SSPCON                            00000215
+SSPCON1                           00000215
+SSPCON2                           00000216
+SSPCON3                           00000217
+SSPEN                             00000005
+SSPMSK                            00000213
+SSPOV                             00000006
+SSPSTAT                           00000214
+SSSEL                             00000005
+STALLIE                           00000005
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 46
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+STALLIF                           00000005
+STANDARD                          0x00 << 5
+STATUS                            00000003
+STATUS_SHAD                       00000FE4
+STKOVF                            00000007
+STKPTR                            00000FED
+STKUNF                            00000006
+STR0DESCBC                        0x04
+STR1DESCBC                        0x10
+STR2DESCBC                        0x12
+STRING                            3
+SUSPND                            00000001
+SWDTEN                            00000000
+SYNC                              00000004
+SYNCH_FRAME                       0x0C
+SendData                          000000C2
+Send_0Len_pkt                     000000B8
+ServiceUSB                        000000F4
+SetAddress                        000001B2
+SetConfiguration                  000001D4
+SetDescriptor                     000001C4
+SetEndpointFeature                00000219
+SetFeature                        000001B0
+SetIdle                           00000266
+SetInterface                      00000209
+SetInterfaceFeature               000001F4
+SetProtocol                       00000268
+SetReport                         0000025D
+Setup                             00000115
+Sh_xy                             0000048F
+ShowByte                          00000460
+ShowBytes                         0000049E
+Stall_EP0_InBuffer                000000AC
+Stall_EP0_OutBuffer               000000A8
+Stall_EP1_InBuffer                000000B4
+Stall_EP1_OutBuffer               000000B0
+StoreReport                       00000260
+String0                           00000359
+String1                           00000364
+String2                           00000387
+StringDescriptor                  0000034C
+T0CS                              00000005
+T0IE                              00000005
+T0IF                              00000002
+T0SE                              00000004
+T1CKPS0                           00000004
+T1CKPS1                           00000005
+T1CON                             00000018
+T1GCON                            00000019
+T1GGO_NOT_DONE                    00000003
+T1GPOL                            00000006
+T1GSEL                            00000003
+T1GSPM                            00000004
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 47
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+T1GSS0                            00000000
+T1GSS1                            00000001
+T1GTM                             00000005
+T1GVAL                            00000002
+T1OSCEN                           00000003
+T2CKPS0                           00000000
+T2CKPS1                           00000001
+T2CON                             0000001C
+T2OUTPS0                          00000003
+T2OUTPS1                          00000004
+T2OUTPS2                          00000005
+T2OUTPS3                          00000006
+TAPE_SUBCLASS                     0x03
+TCOUNT                            0x01
+TEMP0                             000003A4
+TEMP1                             000003A5
+TEMP2                             000003A6
+TEST                              0xfa
+TLog                              000004C3
+TMR0                              00000015
+TMR0CS                            00000005
+TMR0IE                            00000005
+TMR0IF                            00000002
+TMR0SE                            00000004
+TMR1                              00000016
+TMR1CS0                           00000006
+TMR1CS1                           00000007
+TMR1GE                            00000007
+TMR1GIE                           00000007
+TMR1GIF                           00000007
+TMR1H                             00000017
+TMR1IE                            00000000
+TMR1IF                            00000000
+TMR1L                             00000016
+TMR1ON                            00000000
+TMR2                              0000001A
+TMR2IE                            00000001
+TMR2IF                            00000001
+TMR2ON                            00000002
+TOGGLE                            0000007E
+TOKEN_ACK                         (0x02<<2)
+TOKEN_IN                          (0x09<<2)
+TOKEN_OUT                         (0x01<<2)
+TOKEN_SETUP                       (0x0D<<2)
+TOSH                              00000FEF
+TOSL                              00000FEE
+TOTALCONFDESCBC                   CONFDESCBC + IFDESCBC + HIDDESCBC + EPDESCBC + EPDESCBC
+TRISA                             0000008C
+TRISA4                            00000004
+TRISA5                            00000005
+TRISC                             0000008E
+TRISC0                            00000000
+TRISC1                            00000001
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 48
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+TRISC2                            00000002
+TRISC3                            00000003
+TRISC4                            00000004
+TRISC5                            00000005
+TRMT                              00000001
+TRNIE                             00000003
+TRNIF                             00000003
+TUN0                              00000000
+TUN1                              00000001
+TUN2                              00000002
+TUN3                              00000003
+TUN4                              00000004
+TUN5                              00000005
+TUN6                              00000006
+TX9                               00000006
+TX9D                              00000000
+TXEN                              00000005
+TXIE                              00000004
+TXIF                              00000004
+TXREG                             0000019A
+TXSTA                             0000019E
+UA                                00000001
+UADDR                             00000E96
+UCFG                              00000E91
+UCON                              00000E8E
+UEIE                              00000E97
+UEIR                              00000E93
+UEP0                              00000E98
+UEP1                              00000E99
+UEP2                              00000E9A
+UEP3                              00000E9B
+UEP4                              00000E9C
+UEP5                              00000E9D
+UEP6                              00000E9E
+UEP7                              00000E9F
+UERRIE                            00000001
+UERRIF                            00000001
+UFI_SUBCLASS                      0x04
+UFRM                              00000E94
+UFRMH                             00000E94
+UFRML                             00000E95
+UIE                               00000E92
+UIR                               00000E90
+UOWN                              0x07
+UPDATE_PERIOD                     0x03
+UPUEN                             00000004
+URSTIE                            00000000
+URSTIF                            00000000
+USBEN                             00000003
+USBH                              0x02
+USBIE                             00000002
+USBIF                             00000002
+USBL                              0x00
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 49
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+USBReset                          00000061
+USB_HID_CLASS_CODE                0x03
+USB_HUB_CLASS_CODE                0x09
+USB_MASS_STORAGE_CLASS_CODE       0x08
+USB_dev_req                       00000073
+USTAT                             00000E8F
+UTEYE                             00000007
+VENDOR                            0x02 << 5
+VEND_SET_MEMORY                   0x80
+VIDH                              0x04
+VIDL                              0xD8
+VREGCON                           00000197
+VREGPM0                           00000000
+VREGPM1                           00000001
+W                                 00000000
+WCOL                              00000007
+WDTCON                            00000097
+WDTPS0                            00000001
+WDTPS1                            00000002
+WDTPS2                            00000003
+WDTPS3                            00000004
+WDTPS4                            00000005
+WPUA                              0000020C
+WPUA3                             00000003
+WPUA4                             00000004
+WPUA5                             00000005
+WR                                00000001
+WREG                              00000009
+WREG_SHAD                         00000FE5
+WREN                              00000002
+WRERR                             00000003
+WUE                               00000001
+WriteAddr                         000001BA
+Z                                 00000002
+_.org_1_0080                      00000080
+_.org_1_04C1                      000004C1
+_BOREN_NSLEEP                     0000FDFF
+_BOREN_OFF                        0000F9FF
+_BOREN_ON                         0000FFFF
+_BOREN_SBODEN                     0000FBFF
+_BORV_HI                          0000FBFF
+_BORV_LO                          0000FFFF
+_CLKOUTEN_OFF                     0000FFFF
+_CLKOUTEN_ON                      0000F7FF
+_CONFIG1                          00008007
+_CONFIG2                          00008008
+_CPUDIV_CLKDIV2                   0000FFDF
+_CPUDIV_CLKDIV3                   0000FFEF
+_CPUDIV_CLKDIV6                   0000FFFF
+_CPUDIV_NOCLKDIV                  0000FFCF
+_CP_OFF                           0000FFFF
+_CP_ON                            0000FF7F
+_DEVID1                           00008006
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 50
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+_FCMEN_OFF                        0000DFFF
+_FCMEN_ON                         0000FFFF
+_FOSC_ECH                         0000FFFF
+_FOSC_ECL                         0000FFFD
+_FOSC_ECM                         0000FFFE
+_FOSC_EXTRC                       0000FFFB
+_FOSC_HS                          0000FFFA
+_FOSC_INTOSC                      0000FFFC
+_FOSC_LP                          0000FFF8
+_FOSC_XT                          0000FFF9
+_Grn                              00000445
+_IDLOC0                           00008000
+_IDLOC1                           00008001
+_IDLOC2                           00008002
+_IDLOC3                           00008003
+_IESO_OFF                         0000EFFF
+_IESO_ON                          0000FFFF
+_LPBOR_OFF                        0000FFFF
+_LPBOR_ON                         0000F7FF
+_LVP_OFF                          0000DFFF
+_LVP_ON                           0000FFFF
+_MCLRE_OFF                        0000FFBF
+_MCLRE_ON                         0000FFFF
+_PLLEN_DISABLED                   0000FEFF
+_PLLEN_ENABLED                    0000FFFF
+_PLLMULT_3x                       0000FFFF
+_PLLMULT_4x                       0000FF7F
+_PWRTE_OFF                        0000FFFF
+_PWRTE_ON                         0000FFDF
+_STVREN_OFF                       0000FDFF
+_STVREN_ON                        0000FFFF
+_USBLSCLK_24MHz                   0000FFBF
+_USBLSCLK_48MHz                   0000FFFF
+_WDTE_NSLEEP                      0000FFF7
+_WDTE_OFF                         0000FFE7
+_WDTE_ON                          0000FFFF
+_WDTE_SWDTEN                      0000FFEF
+_WRT_ALL                          0000FFFC
+_WRT_BOOT                         0000FFFE
+_WRT_HALF                         0000FFFD
+_WRT_OFF                          0000FFFF
+__16F1454                         00000001
+__DEBUG                           
+act_cf                            00000084
+bConfig                           000003A0
+bRequest                          0x01
+bmRequestType                     0x00
+configured                        000001DC
+ds_ex                             000004C1
+err                               00000011
+exit_int                          00000020
+fallthrough                       00000237
+floff                             00000431
+MPASM 5.55                          MAIN.ASM   7-13-2014  14:02:47         PAGE 51
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+floffC_bk                         00000433
+floff_bk                          00000435
+flon                              00000428
+flonC_bk                          0000042B
+flon_bk                           0000042D
+getFeatureReport                  00000257
+getInputReport                    0000024C
+hi                                00000465
+idle                              0000001A
+ifGetDescriptor                   000001F6
+incGD                             00000456
+incSA                             0000045B
+it_clr                            0000048B
+lo                                00000473
+loop_bk                           000000E7
+nSA                               00000498
+num_gd                            000003A2
+num_rst                           000003A1
+num_sa                            000003A3
+pll_bk                            00000058
+psC0_bk                           00000412
+psC1_bk                           00000414
+psT_bk                            00000416
+rset                              0000001E
+se0_bk                            0000005D
+sendD                             000002C1
+send_bAlternate                   000001FF
+send_data_int                     0000026A
+setConf                           00000451
+su_exit                           0000018F
+tRst                              0000044B
+t_In                              000004BD
+t_out                             000004A9
+tc                                000003A8
+test                              000003A9
+tranCom                           0000001C
+unSupp                            000002BD
+wIndex                            0x04
+wIndexHigh                        0x05
+wLength                           0x06
+wLengthHigh                       0x07
+wValue                            0x02
+wValueHigh                        0x03
+
+Errors   :     0
+Warnings :     0 reported,     0 suppressed
+Messages :     0 reported,    88 suppressed
+
+
