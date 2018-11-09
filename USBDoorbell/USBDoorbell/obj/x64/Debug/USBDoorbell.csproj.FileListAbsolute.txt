@@ -1,0 +1,8 @@
+F:\Projects\Archive\USBDoorbell\USBDoorbell\bin\x64\Debug\USBDoorbell.exe.config
+F:\Projects\Archive\USBDoorbell\USBDoorbell\bin\x64\Debug\USBDoorbell.exe
+F:\Projects\Archive\USBDoorbell\USBDoorbell\bin\x64\Debug\USBDoorbell.pdb
+F:\Projects\Archive\USBDoorbell\USBDoorbell\obj\x64\Debug\USBDoorbell.Form1.resources
+F:\Projects\Archive\USBDoorbell\USBDoorbell\obj\x64\Debug\USBDoorbell.Properties.Resources.resources
+F:\Projects\Archive\USBDoorbell\USBDoorbell\obj\x64\Debug\USBDoorbell.csproj.GenerateResource.Cache
+F:\Projects\Archive\USBDoorbell\USBDoorbell\obj\x64\Debug\USBDoorbell.exe
+F:\Projects\Archive\USBDoorbell\USBDoorbell\obj\x64\Debug\USBDoorbell.pdb

@@ -1,0 +1,9 @@
+E:\Projects\Doorbell\Doorbell\bin\Release\Doorbell.exe.config
+E:\Projects\Doorbell\Doorbell\bin\Release\Doorbell.exe
+E:\Projects\Doorbell\Doorbell\bin\Release\Doorbell.pdb
+E:\Projects\Doorbell\Doorbell\obj\Release\Doorbell.Form1.resources
+E:\Projects\Doorbell\Doorbell\obj\Release\Doorbell.Properties.Resources.resources
+E:\Projects\Doorbell\Doorbell\obj\Release\Doorbell.csproj.GenerateResource.Cache
+E:\Projects\Doorbell\Doorbell\obj\Release\Doorbell.exe
+E:\Projects\Doorbell\Doorbell\obj\Release\Doorbell.pdb
+E:\Projects\Doorbell\Doorbell\obj\Release\Doorbell.csprojResolveAssemblyReference.cache
