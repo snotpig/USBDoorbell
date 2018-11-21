@@ -1,15 +1,14 @@
-﻿using BuzzWin;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
-
+using USB;
 
 namespace USBDoorbell
 {
-    public partial class Form1 : UsbAwareForm
+    public partial class Form1 : Form
     {
         private const int NUMSOUNDS = 5;
 
@@ -20,7 +19,9 @@ namespace USBDoorbell
         private Icon disconnectedIcon;
         private Icon mutedIcon;
   
-        private MyDevice device;
+        private USBDevice device;
+        private Guid deviceClassGuid;
+        private IntPtr usbEventHandle;
         private System.Media.SoundPlayer player;
         private System.Timers.Timer timerBell = new System.Timers.Timer();
         private bool isPlaying = false;
@@ -31,6 +32,7 @@ namespace USBDoorbell
         public Form1()
         {
             InitializeComponent();
+            deviceClassGuid = Win32Usb.HIDGuid;
             path = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             connectedIcon = new Icon(System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("USBDoorbell.Resources.goldBell.ico"));
             disconnectedIcon = new Icon(System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("USBDoorbell.Resources.greyBell.ico"));
@@ -69,10 +71,33 @@ namespace USBDoorbell
             label.Text = text;
         }
 
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            usbEventHandle = Win32Usb.RegisterForUsbEvents(Handle, deviceClassGuid);
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == Win32Usb.WM_DEVICECHANGE) 
+            {
+                switch (m.WParam.ToInt32()) 
+                {
+                    case Win32Usb.DEVICE_ARRIVAL:
+                        DeviceArrived();
+                        break;
+                    case Win32Usb.DEVICE_REMOVECOMPLETE:
+                        DeviceRemoved();
+                        break;
+                }
+            }
+            base.WndProc(ref m);
+        }
+
         protected override void OnLoad(EventArgs e)
         {
-            Visible = false; // Hide form window.
-            ShowInTaskbar = false; // Remove from taskbar.
+            Visible = false;
+            ShowInTaskbar = false;
             base.OnLoad(e);
         }
 
@@ -84,10 +109,10 @@ namespace USBDoorbell
 
         private bool Connect()
         {
-            device = MyDevice.FindDevice();
+            device = USBDevice.FindDevice();
             if (device != null)
             {
-                device.OnButtonChanged += button_Press;
+                device.OnButtonChanged += Button_Press;
                 return true;
             }
             return false;
@@ -108,7 +133,7 @@ namespace USBDoorbell
             }
         }
 
-        private void button_Press(object sender, EventArgs e)
+        private void Button_Press(object sender, EventArgs e)
         {
             RingBell();
         }
@@ -142,18 +167,15 @@ namespace USBDoorbell
                 
         }
 
-
-        protected override void OnDeviceArrived(EventArgs args)
+        private void DeviceArrived()
         {
-            base.OnDeviceArrived(args);
             if (!isConnected) isConnected = Connect();
             ShowStatus();
         }
 
-        protected override void OnDeviceRemoved(EventArgs args)
+        private void DeviceRemoved()
         {
-            base.OnDeviceRemoved(args);
-            isConnected = MyDevice.CheckPresent();
+            isConnected = USBDevice.CheckPresent();
             ShowStatus();
         }
 
