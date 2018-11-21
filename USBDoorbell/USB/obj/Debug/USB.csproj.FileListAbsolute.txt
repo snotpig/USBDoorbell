@@ -4,3 +4,9 @@ D:\Projects\USBDoorbell2\USB\bin\Debug\USB.dll
 D:\Projects\USBDoorbell2\USB\bin\Debug\USB.pdb
 D:\Projects\USBDoorbell2\USB\obj\Debug\USB.dll
 D:\Projects\USBDoorbell2\USB\obj\Debug\USB.pdb
+D:\Projects\GitHub\USBDoorbell\USBDoorbell\USB\bin\Debug\USB.dll
+D:\Projects\GitHub\USBDoorbell\USBDoorbell\USB\bin\Debug\USB.pdb
+D:\Projects\GitHub\USBDoorbell\USBDoorbell\USB\obj\Debug\USB.csprojAssemblyReference.cache
+D:\Projects\GitHub\USBDoorbell\USBDoorbell\USB\obj\Debug\USB.csproj.CoreCompileInputs.cache
+D:\Projects\GitHub\USBDoorbell\USBDoorbell\USB\obj\Debug\USB.dll
+D:\Projects\GitHub\USBDoorbell\USBDoorbell\USB\obj\Debug\USB.pdb
