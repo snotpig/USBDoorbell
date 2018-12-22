@@ -1,0 +1,6 @@
+D:\Projects\GitHub\USBDoorbell\USBDoorbell\USB\bin\Release\USB.dll
+D:\Projects\GitHub\USBDoorbell\USBDoorbell\USB\bin\Release\USB.pdb
+D:\Projects\GitHub\USBDoorbell\USBDoorbell\USB\obj\Release\USB.csprojAssemblyReference.cache
+D:\Projects\GitHub\USBDoorbell\USBDoorbell\USB\obj\Release\USB.csproj.CoreCompileInputs.cache
+D:\Projects\GitHub\USBDoorbell\USBDoorbell\USB\obj\Release\USB.dll
+D:\Projects\GitHub\USBDoorbell\USBDoorbell\USB\obj\Release\USB.pdb

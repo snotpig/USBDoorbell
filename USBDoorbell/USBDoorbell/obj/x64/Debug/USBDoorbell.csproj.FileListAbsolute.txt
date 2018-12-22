@@ -6,3 +6,16 @@ F:\Projects\Archive\USBDoorbell\USBDoorbell\obj\x64\Debug\USBDoorbell.Properties
 F:\Projects\Archive\USBDoorbell\USBDoorbell\obj\x64\Debug\USBDoorbell.csproj.GenerateResource.Cache
 F:\Projects\Archive\USBDoorbell\USBDoorbell\obj\x64\Debug\USBDoorbell.exe
 F:\Projects\Archive\USBDoorbell\USBDoorbell\obj\x64\Debug\USBDoorbell.pdb
+D:\Projects\GitHub\USBDoorbell\USBDoorbell\USBDoorbell\bin\x64\Debug\USBDoorbell.exe.config
+D:\Projects\GitHub\USBDoorbell\USBDoorbell\USBDoorbell\bin\x64\Debug\USBDoorbell.exe
+D:\Projects\GitHub\USBDoorbell\USBDoorbell\USBDoorbell\bin\x64\Debug\USBDoorbell.pdb
+D:\Projects\GitHub\USBDoorbell\USBDoorbell\USBDoorbell\bin\x64\Debug\USB.dll
+D:\Projects\GitHub\USBDoorbell\USBDoorbell\USBDoorbell\bin\x64\Debug\USB.pdb
+D:\Projects\GitHub\USBDoorbell\USBDoorbell\USBDoorbell\obj\x64\Debug\USBDoorbell.csprojAssemblyReference.cache
+D:\Projects\GitHub\USBDoorbell\USBDoorbell\USBDoorbell\obj\x64\Debug\USBDoorbell.Form1.resources
+D:\Projects\GitHub\USBDoorbell\USBDoorbell\USBDoorbell\obj\x64\Debug\USBDoorbell.Properties.Resources.resources
+D:\Projects\GitHub\USBDoorbell\USBDoorbell\USBDoorbell\obj\x64\Debug\USBDoorbell.csproj.GenerateResource.cache
+D:\Projects\GitHub\USBDoorbell\USBDoorbell\USBDoorbell\obj\x64\Debug\USBDoorbell.csproj.CoreCompileInputs.cache
+D:\Projects\GitHub\USBDoorbell\USBDoorbell\USBDoorbell\obj\x64\Debug\USBDoorbell.csproj.CopyComplete
+D:\Projects\GitHub\USBDoorbell\USBDoorbell\USBDoorbell\obj\x64\Debug\USBDoorbell.exe
+D:\Projects\GitHub\USBDoorbell\USBDoorbell\USBDoorbell\obj\x64\Debug\USBDoorbell.pdb
